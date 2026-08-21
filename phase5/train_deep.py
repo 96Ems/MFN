@@ -131,6 +131,10 @@ def main():
                     help="epoch de reprise (1 par défaut). >1 -> charge le "
                          "checkpoint phase5/checkpoints/<tag> et backfill "
                          "l'historique des epochs déjà faites")
+    ap.add_argument("--compile", action="store_true",
+                    help="torch.compile mode reduce-overhead (CUDA graphs) — "
+                         "fallback eager si indisponible sur cette carte")
+    ap.add_argument("--eval-batch", type=int, default=16)
     args = ap.parse_args()
 
     torch.set_num_threads(args.threads)
@@ -165,6 +169,13 @@ def main():
                   f"checkpoint -> init fraîche", flush=True)
         model = build_deep(tag, vocab, **kw).to(device)
         history = []
+    if args.compile:
+        try:
+            model = torch.compile(model, mode="reduce-overhead")
+            print(f"[{tag}] torch.compile ACTIVE (reduce-overhead)", flush=True)
+        except Exception as e:
+            print(f"[{tag}] torch.compile indisponible ({e}) -> eager",
+                  flush=True)
     n_params = true_param_count(model)
     print(f"[{tag}] widths={kw['widths']} skip={kw['skip_fb']} "
           f"topdown={kw['topdown']} params={n_params} epochs={args.epochs} "
@@ -176,7 +187,7 @@ def main():
     for ep in range(args.start_epoch, args.epochs + 1):
         t0 = time.time()
         train_loss, tok_s = run_epoch(model, train_ids, optimizer, args, device)
-        val_loss = evaluate(model, val_ids, device)
+        val_loss = evaluate(model, val_ids, device, batch=args.eval_batch)
         ppl = float(np.exp(val_loss))
         bpc = val_loss * stats["validation"]["tokens_per_char"] / np.log(2.0)
         print(f"[{tag}] epoch {ep}/{args.epochs}: train {train_loss:.4f} | "
@@ -193,7 +204,7 @@ def main():
 
     best_dir = os.path.join(CKPT, tag)
     best_model = type(model).from_pretrained(best_dir).to(device)
-    test_loss = evaluate(best_model, test_ids, device)
+    test_loss = evaluate(best_model, test_ids, device, batch=args.eval_batch)
     ppl_t, bpc_t = float(np.exp(test_loss)), \
         test_loss * stats["test"]["tokens_per_char"] / np.log(2.0)
     print(f"[{tag}] TEST loss {test_loss:.4f} ppl {ppl_t:.2f} bpc {bpc_t:.4f}", flush=True)
