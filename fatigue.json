@@ -1,0 +1,14 @@
+{
+  "mean_fatigue_lam": 0.14570677280426025,
+  "mean_fatigue_psi": 0.11858806014060974,
+  "saturated_fraction_lam": 0.0,
+  "saturated_fraction_psi": 0.0,
+  "fraction_above_0.3_lam": 0.0,
+  "fraction_above_0.3_psi": 0.014843749813735485,
+  "pearson_corr_phi_lam_phi_psi": 0.9943247437477112,
+  "pearson_per_neuron_mean": 0.15334270289167762,
+  "pearson_per_neuron_min": 0.06816844642162323,
+  "pearson_per_neuron_max": 0.308411180973053,
+  "final_loss_k10": 0.4625076949596405,
+  "params": 94794
+}

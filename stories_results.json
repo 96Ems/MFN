@@ -1,0 +1,374 @@
+{
+  "gpt2mini": {
+    "tag": "gpt2mini",
+    "model": "gpt2mini",
+    "hidden": 120,
+    "params": 1250640,
+    "epochs": 6,
+    "batch": 64,
+    "seq": 128,
+    "lr": 0.001,
+    "dropout": 0.0,
+    "seed": 0,
+    "threads": 1,
+    "best_val_loss": 3.5078,
+    "test_loss": 3.5319,
+    "test_ppl": 34.19,
+    "test_bpc": 1.2973,
+    "tokens_per_char_val": 0.2541,
+    "history": [
+      {
+        "epoch": 1,
+        "train_loss": 4.7646,
+        "val_loss": 4.0553,
+        "ppl": 57.7,
+        "bpc": 1.4866,
+        "tok_s": 2925.6,
+        "elapsed_s": 3143.6
+      },
+      {
+        "epoch": 2,
+        "train_loss": 3.9086,
+        "val_loss": 3.7748,
+        "ppl": 43.59,
+        "bpc": 1.3838,
+        "tok_s": 3068.5,
+        "elapsed_s": 2992.0
+      },
+      {
+        "epoch": 3,
+        "train_loss": 3.6928,
+        "val_loss": 3.6467,
+        "ppl": 38.35,
+        "bpc": 1.3368,
+        "tok_s": 3050.4,
+        "elapsed_s": 3010.5
+      },
+      {
+        "epoch": 4,
+        "train_loss": 3.5819,
+        "val_loss": 3.58,
+        "ppl": 35.87,
+        "bpc": 1.3124,
+        "tok_s": 3060.2,
+        "elapsed_s": 3004.9
+      },
+      {
+        "epoch": 5,
+        "train_loss": 3.5163,
+        "val_loss": 3.5365,
+        "ppl": 34.35,
+        "bpc": 1.2964,
+        "tok_s": 2888.5,
+        "elapsed_s": 3181.7
+      },
+      {
+        "epoch": 6,
+        "train_loss": 3.4724,
+        "val_loss": 3.5078,
+        "ppl": 33.38,
+        "bpc": 1.2859,
+        "tok_s": 3009.8,
+        "elapsed_s": 3053.3
+      }
+    ],
+    "samples": {
+      "Once upon a time,": {
+        "sample": "Once upon a time, was little who in small. had toy that very. day it broken and and could things Every when were, would up\n day would and to special to friends They with. were happy they sol the thing They had seen.One, went the said his was gift and it perfect.The girl so her gave a hug showed the. was happy make new and happy She always her to it\n day She up her with friend They many. was happy",
+        "greedy": "Once upon a time, was little named. was very and to. day she a, she a girl Lily to her to with. was happy she to her and, she her gave a hug\n then to her. was happy she her. played her and with friends day. was happy her.<|endoftext|>"
+      },
+      "The little girl found a": {
+        "sample": "The little girl found a box paper painted She. took to a and it very of color The girl so that had of. showed to mommy pretty. mommy some, was happy her picture\n little, she it like picture The girl happy. thanked mommy ran home show mom clever.<|endoftext|>",
+        "greedy": "The little girl found a. was excited She to the and what wanted do She to with. asked mom she a.\"'s to to to to the?\" asked.\" don know said little,\" mom.The girl and mom and little were.The girl to the girl to the girl the.\", you to the girl said \" you to the girl\n girl\n girl, are. are. are. are. are. are. are. are. are."
+      },
+      "Tim and his dog were walking in the park when": {
+        "sample": "Tim and his dog were walking in the park when stopped. saw man a boy wasing. was and to, he something wrong The was. boy up him and, started laugh\nHi. boy sad He a boy but didn understand The. knew why was sad wanted play. decided give boy a.He around said \", want play it.\" man for boy why asked boy not share he, the dog., boy that can you me with?\"The boy about. boy happy see boy smiled",
+        "greedy": "Tim and his dog were walking in the park when saw big. was and and. wanted see was. ran the and to tree Tim\nCan climb tree Tim Tim Tim Tim Tim Tim Tim Tim Tim Tim Tim Tim Tim Tim Tim Tim Tim Tim Tim Tim Tim Tim Tim Tim Tim Tim Tim Tim Tim Tim Tim Tim Tim Tim Tim Tim Tim Tim Tim Tim Tim Tim Tim Tim Tim Tim Tim Tim Tim Tim Tim Tim Tim Tim Tim Tim Tim Tim Tim Tim Tim Tim Tim Tim Tim Tim Tim Tim Tim"
+      },
+      "The robot wanted to": {
+        "sample": "The robot wanted to out the. the said \" don go away\n bear The is and will be!\" thief.The did want wait the to. said \"'s! will our!\"Max for long. said \" can go!\" bear to park. can you myiddle Maxger Max\n Max. won give a prize Max Max bone Max Max Max Max Max Max Max Max Max Max They fun. was happy Max Max Max Max Rex He Spot licked Max\n that was",
+        "greedy": "The robot wanted to the. asked robot \" is. can help?\" robot. said \" can you me my?\"The was. said \", can you me my?\"The said.\" robot.The was. said \", you to. can your with?\"The said.The said. said \", you to. you to. you to. you to. you to. you to. you to. you to. you to me\n\n\n robot. are"
+      }
+    },
+    "tokenizer": "/home/emericclement/dev/MFN/tokenizer_stories"
+  },
+  "gru": {
+    "tag": "gru",
+    "model": "gru",
+    "hidden": 215,
+    "params": 1159710,
+    "epochs": 6,
+    "batch": 64,
+    "seq": 128,
+    "lr": 0.001,
+    "dropout": 0.0,
+    "seed": 0,
+    "threads": 1,
+    "best_val_loss": 2.5267,
+    "test_loss": 2.543,
+    "test_ppl": 12.72,
+    "test_bpc": 0.9341,
+    "tokens_per_char_val": 0.2541,
+    "history": [
+      {
+        "epoch": 1,
+        "train_loss": 3.6777,
+        "val_loss": 2.9514,
+        "ppl": 19.13,
+        "bpc": 1.082,
+        "tok_s": 2889.0,
+        "elapsed_s": 3193.1
+      },
+      {
+        "epoch": 2,
+        "train_loss": 2.8392,
+        "val_loss": 2.7445,
+        "ppl": 15.56,
+        "bpc": 1.0061,
+        "tok_s": 2950.2,
+        "elapsed_s": 3126.4
+      },
+      {
+        "epoch": 3,
+        "train_loss": 2.6775,
+        "val_loss": 2.6447,
+        "ppl": 14.08,
+        "bpc": 0.9695,
+        "tok_s": 2955.9,
+        "elapsed_s": 3118.9
+      },
+      {
+        "epoch": 4,
+        "train_loss": 2.5903,
+        "val_loss": 2.5895,
+        "ppl": 13.32,
+        "bpc": 0.9493,
+        "tok_s": 2992.2,
+        "elapsed_s": 3084.7
+      },
+      {
+        "epoch": 5,
+        "train_loss": 2.5368,
+        "val_loss": 2.5531,
+        "ppl": 12.85,
+        "bpc": 0.936,
+        "tok_s": 2838.0,
+        "elapsed_s": 3246.9
+      },
+      {
+        "epoch": 6,
+        "train_loss": 2.4995,
+        "val_loss": 2.5267,
+        "ppl": 12.51,
+        "bpc": 0.9263,
+        "tok_s": 2976.4,
+        "elapsed_s": 3096.5
+      }
+    ],
+    "samples": {
+      "Once upon a time,": {
+        "sample": "Once upon a time, there was an old man who loved he wanted. He couldn't do it, but he had just a long tail. One day, the boy decided to try something new.\nThe boy asked him if he could borrow his truck. The child said yes and went in to see their dad.\nThe boy smiled and said he was so happy. He looked at the little girl's eyes and asked for help. She felt very sad and she started",
+        "greedy": "Once upon a time, there was a little girl named Lily. She loved to play outside in the sun. One day, she saw a big tree with a big tree. She wanted to climb it, but she was too high.\n\"Mommy, can I climb the tree?\" Lily asked.\n\"Yes, we can. But we have to be careful. It might be dangerous.\"\nLily nodded and said, \"Yes, we can. But we have to"
+      },
+      "The little girl found a": {
+        "sample": "The little girl found a beautiful butterfly. She was so happy and said, \"Thank you, mom!\" The girl and the other children were both very happy.\n<|endoftext|>",
+        "greedy": "The little girl found a big, shiny rock. She was so excited! She picked it up and put it in her pocket.\nThe little girl was so excited that she ran to the garden and found a big, juicy apple. She was so happy that she had found the perfect spot. She was so happy that she had found the perfect spot.\n<|endoftext|>"
+      },
+      "Tim and his dog were walking in the park when": {
+        "sample": "Tim and his dog were walking in the park when the dog saw a big dog. The dog was very hairy and wanted to play with him. Tom ran over the gate and tried to grab it up. But, no one heard the noise.\n\"Hey, you! I am here!\" he shouted. He was scared.\nThe boy saw that Tommy was not frightened. He said sorry to him. \"Don't worry, let's play with the dog, Spot. You are safe and",
+        "greedy": "Tim and his dog were walking in the park when he saw a big dog. The dog was very friendly and wanted to play with it.\nThe dog barked and wagged his tail. He ran to the dog and barked. He ran to the dog and licked his face. He was very happy.\n\"Hi, dog!\" Tom said. \"You are a good dog. You are a good dog. You are very kind. You are a good dog. You are a good dog. You"
+      },
+      "The robot wanted to": {
+        "sample": "The robot wanted to help the mouse make a hole. He looked up and found a big box of cardboard inside.\nThey started to gather their languages, but they were very messy. They tried their puzzle pieces. But it wouldn't budge them. They did not want it anymore.\n\"Ouch! We have to share. How can we get you some cake?\" Mom said. She turned around the room and saw that the scale was",
+        "greedy": "The robot wanted to make a new friend. He said, \"Yes, I can. I will be a good friend.\"\nThe prince smiled and said, \"Yes, I am. I am proud of you. I am proud of you.\"\nThe prince was very happy. He had a big smile and a funny song. He was happy that he had made a new friend.\n<|endoftext|>"
+      }
+    },
+    "tokenizer": "/home/emericclement/dev/MFN/tokenizer_stories"
+  },
+  "mfn_dense_nobidir": {
+    "tag": "mfn_dense_nobidir",
+    "model": "mfn_dense_nobidir",
+    "hidden": 144,
+    "params": 1049472,
+    "epochs": 6,
+    "batch": 64,
+    "seq": 128,
+    "lr": 0.001,
+    "dropout": 0.0,
+    "seed": 0,
+    "threads": 1,
+    "best_val_loss": 2.5125,
+    "test_loss": 2.532,
+    "test_ppl": 12.58,
+    "test_bpc": 0.93,
+    "tokens_per_char_val": 0.2541,
+    "history": [
+      {
+        "epoch": 1,
+        "train_loss": 3.9014,
+        "val_loss": 3.0353,
+        "ppl": 20.81,
+        "bpc": 1.1127,
+        "tok_s": 2690.7,
+        "elapsed_s": 3448.5
+      },
+      {
+        "epoch": 2,
+        "train_loss": 2.8999,
+        "val_loss": 2.7815,
+        "ppl": 16.14,
+        "bpc": 1.0197,
+        "tok_s": 2773.6,
+        "elapsed_s": 3343.3
+      },
+      {
+        "epoch": 3,
+        "train_loss": 2.7166,
+        "val_loss": 2.6653,
+        "ppl": 14.37,
+        "bpc": 0.9771,
+        "tok_s": 2758.2,
+        "elapsed_s": 3362.5
+      },
+      {
+        "epoch": 4,
+        "train_loss": 2.618,
+        "val_loss": 2.5962,
+        "ppl": 13.41,
+        "bpc": 0.9517,
+        "tok_s": 2681.8,
+        "elapsed_s": 3463.6
+      },
+      {
+        "epoch": 5,
+        "train_loss": 2.552,
+        "val_loss": 2.5482,
+        "ppl": 12.78,
+        "bpc": 0.9341,
+        "tok_s": 2665.7,
+        "elapsed_s": 3477.9
+      },
+      {
+        "epoch": 6,
+        "train_loss": 2.5029,
+        "val_loss": 2.5125,
+        "ppl": 12.34,
+        "bpc": 0.921,
+        "tok_s": 3215.0,
+        "elapsed_s": 2872.3
+      }
+    ],
+    "samples": {
+      "Once upon a time,": {
+        "sample": "Once upon a time, there was a little girl named Lily. She loved to play outside in the sun. One day, she decided to go for a walk in the park.\nWhile running, she found a newspaper. She asked her mom if she could keep it. Her mom said yes and gave her some of her money to buy some candy. The kitten looked so adorable! It made Sarah feel happy and excited about her adventure.\n<|endoftext|>",
+        "greedy": "Once upon a time, there was a little girl named Lily. She loved to play with her toys and her favorite toy was a big, red car. One day, Lily's mom asked her to help her with a big, red car. Lily was so excited and she wanted to play with it.\nLily's mom said, \"Let's go to the store and buy some food for you.\" Lily was very excited and said, \"Yes, please!\"\nHer"
+      },
+      "The little girl found a": {
+        "sample": "The little girl found a big red tree. She was so excited to play with it. But then, she saw something that was coming from a tree.\nAmy asked her mom if she could open the door with all her hands. Her mum said yes and they started walking in the park.\nThey looked under a tree, where she found a special spot. She looked inside the window and saw a cute old owl sitting in a tree. \"Hi there!\", he",
+        "greedy": "The little girl found a big, shiny rock. She was so excited to see it. She picked it up and showed it to her mom. Her mom was so proud of her for finding the pretty jewel.\nThe little girl was so happy that she had found her friend. She was so happy that she had found her friend. She was so happy that she had found her friend.\n<|endoftext|>"
+      },
+      "Tim and his dog were walking in the park when": {
+        "sample": "Tim and his dog were walking in the park when he heard a loud noise. It was coming from a big tree. Tim ran to the window and knocked on his door.\n\"Please, Max!\" Tom cried. \"We are here.\"\nBen felt sorry. He did not like his friend or his grandpa. He wanted him back. He wanted to have his home and the boy.\nHis mom came downstairs and saw the dog. She saw Max's leg and said, \"Stop",
+        "greedy": "Tim and his dog were walking in the park when he saw a big, scary dog. The dog was barking and running towards them. Max was scared and ran away.\nMax saw Max and Lily and ran to him. He was very angry and scared. He wanted to play with Max. He ran to the dog and hid behind a tree.\n\"Hi, dog!\" Max said. \"Do you want to play with me?\"\nMax looked at the dog. He saw that he was"
+      },
+      "The robot wanted to": {
+        "sample": "The robot wanted to make someone laugh.\n\"Wow, that's a very special print,\" said Bill. \"This is a good idea! We can write the picture of them.\"\nGrandma and Dad were very excited. They asked their parents for help. What happened to do?\" the dad replied.\nThe children looked around together. \"We are making an Quick!\" The Pattary smiled and said, \"Okay, I'll be friends",
+        "greedy": "The robot wanted to play with the dragon. They ran to the dragon and said, \"Hello, I am the king of the king. I am very happy. I am the king of the king. I am very happy. I am the king of the king. I am very happy.\"\nThe prince was very happy. He thanked the king and the queen. He said, \"Thank you, prince. You are very kind. I am sorry. I will"
+      }
+    },
+    "tokenizer": "/home/emericclement/dev/MFN/tokenizer_stories"
+  },
+  "mfn_dense": {
+    "tag": "mfn_dense",
+    "model": "mfn_dense",
+    "hidden": 144,
+    "params": 1153440,
+    "epochs": 6,
+    "batch": 64,
+    "seq": 128,
+    "lr": 0.001,
+    "dropout": 0.0,
+    "seed": 0,
+    "threads": 1,
+    "best_val_loss": 2.5092,
+    "test_loss": 2.5296,
+    "test_ppl": 12.55,
+    "test_bpc": 0.9291,
+    "tokens_per_char_val": 0.2541,
+    "history": [
+      {
+        "epoch": 1,
+        "train_loss": 3.9063,
+        "val_loss": 3.0345,
+        "ppl": 20.79,
+        "bpc": 1.1124,
+        "tok_s": 2514.1,
+        "elapsed_s": 3686.0
+      },
+      {
+        "epoch": 2,
+        "train_loss": 2.8971,
+        "val_loss": 2.7799,
+        "ppl": 16.12,
+        "bpc": 1.0191,
+        "tok_s": 2589.5,
+        "elapsed_s": 3580.3
+      },
+      {
+        "epoch": 3,
+        "train_loss": 2.7149,
+        "val_loss": 2.664,
+        "ppl": 14.35,
+        "bpc": 0.9766,
+        "tok_s": 2561.9,
+        "elapsed_s": 3621.1
+      },
+      {
+        "epoch": 4,
+        "train_loss": 2.6148,
+        "val_loss": 2.5932,
+        "ppl": 13.37,
+        "bpc": 0.9506,
+        "tok_s": 2428.8,
+        "elapsed_s": 3821.8
+      },
+      {
+        "epoch": 5,
+        "train_loss": 2.5473,
+        "val_loss": 2.5453,
+        "ppl": 12.75,
+        "bpc": 0.9331,
+        "tok_s": 2532.5,
+        "elapsed_s": 3677.2
+      },
+      {
+        "epoch": 6,
+        "train_loss": 2.4989,
+        "val_loss": 2.5092,
+        "ppl": 12.29,
+        "bpc": 0.9198,
+        "tok_s": 3633.9,
+        "elapsed_s": 2543.4
+      }
+    ],
+    "samples": {
+      "Once upon a time,": {
+        "sample": "Once upon a time, there was a little boy named Timmy. Timmy had a big smile and loved playing with his toys, especially even the other animals in the living room. One day, Timmy's mom said they were there to put it on top of the fridge. Timmy was so excited! He showed out that his favorite car was so special! Timmy was so happy!\nThey played together all sorts of fun games until one night, they found a beautiful picture of a",
+        "greedy": "Once upon a time, there was a little girl named Lily. She loved to play with her toys and play with her toys. One day, she went to the park with her mom. She saw a big, red ball. She wanted to play with it.\nLily asked her mom if she could go to the park. Her mom said yes and they went to the park. Lily was so excited to play with her toys. She played with her toys and played with"
+      },
+      "The little girl found a": {
+        "sample": "The little girl found a special jewel. It was so big and sparkly. She asked her friend, a big tree that could make new things for them. The bird was happy to see the butterfly. They were having fun together, but they were happy they had fun in it.\n<|endoftext|>",
+        "greedy": "The little girl found a big, round tree. She was so excited to see it! She ran to the tree and started to climb it. She was so excited! She jumped up and down and started to climb the tree.\nThe butterfly flew away, but the butterfly was too fast. The butterfly flew away and landed on the ground. The bird flew away and landed on the ground. The bird flew away, happy to have a new friend.\n<|endoftext|>"
+      },
+      "Tim and his dog were walking in the park when": {
+        "sample": "Tim and his dog were walking in the park when they saw a big hill. They were so happy to see that it was time to go home. Sam said, \"Let's go inside now and find a way to do our best.\"\nBut then he saw a big dog stuck in a tree. The dog barked and ran towards them. Tim and Max were scared. They shouted, \"Help! Why are you sad?\"\nThe cat and the man looked at each other and saw their mom",
+        "greedy": "Tim and his dog were walking in the park when they saw a big, scary dog. The dog was barking and running around.\n\"Hey, what are you doing?\" he asked.\n\"I'm here to play with you,\" said Max.\n\"I'm here, but I'm scared,\" said Max.\n\"I'm okay, Max,\" said Max. \"I'm glad you're safe.\"\nMax smiled and said, \"I love you too, Max. You are"
+      },
+      "The robot wanted to": {
+        "sample": "The robot wanted to take a real rocket. The man was afraid because he could help the man.\nThe little boy tried to fix the statue. But his friend came in loud and could not move it! It was very fragile too, and Tim laughed. So, they started to draw together.\nThe end.\n<|endoftext|>",
+        "greedy": "The robot wanted to help. He said, \"I will help you. But you have to be careful. You have to be careful. You have to be careful. You have to be careful. You have to be careful. You have to be careful. You have to be careful. You have to be careful. You have to be careful. You have to be careful. You have to be careful. You have to be careful. You have to be careful."
+      }
+    },
+    "tokenizer": "/home/emericclement/dev/MFN/tokenizer_stories"
+  }
+}

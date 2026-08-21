@@ -1,0 +1,17 @@
+{
+  "mfn": {
+    "best_valid_bpc": 1.3617,
+    "test_bpc": 1.3341,
+    "params": 107634
+  },
+  "gru": {
+    "best_valid_bpc": 1.2293,
+    "test_bpc": 1.196,
+    "params": 191640
+  },
+  "grumatched": {
+    "best_valid_bpc": 1.3114782025416691,
+    "test_bpc": 1.281963414616055,
+    "params": 107175
+  }
+}

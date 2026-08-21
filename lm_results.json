@@ -1,0 +1,414 @@
+{
+  "gru": {
+    "tag": "gru",
+    "model": "gru",
+    "hidden": 199,
+    "params": 1053904,
+    "epochs": 8,
+    "batch": 64,
+    "seq": 128,
+    "lr": 0.0003,
+    "seed": 0,
+    "threads": 1,
+    "best_val_loss": 5.5247,
+    "test_loss": 5.516,
+    "test_ppl": 248.64,
+    "test_bpc": 2.2728,
+    "tokens_per_char_val": 0.282,
+    "tokens_per_char_test": 0.2856,
+    "history": [
+      {
+        "epoch": 1,
+        "train_loss": 7.1672,
+        "val_loss": 6.8982,
+        "ppl": 990.45,
+        "bpc": 2.8064,
+        "tok_s": 3043.6,
+        "elapsed_s": 1050.8
+      },
+      {
+        "epoch": 2,
+        "train_loss": 6.7903,
+        "val_loss": 6.6482,
+        "ppl": 771.39,
+        "bpc": 2.7048,
+        "tok_s": 3105.9,
+        "elapsed_s": 1032.8
+      },
+      {
+        "epoch": 3,
+        "train_loss": 6.4571,
+        "val_loss": 6.271,
+        "ppl": 529.03,
+        "bpc": 2.5513,
+        "tok_s": 3095.4,
+        "elapsed_s": 1035.9
+      },
+      {
+        "epoch": 4,
+        "train_loss": 6.1577,
+        "val_loss": 6.067,
+        "ppl": 431.4,
+        "bpc": 2.4683,
+        "tok_s": 3109.9,
+        "elapsed_s": 1035.3
+      },
+      {
+        "epoch": 5,
+        "train_loss": 5.9815,
+        "val_loss": 5.9176,
+        "ppl": 371.5,
+        "bpc": 2.4075,
+        "tok_s": 3127.7,
+        "elapsed_s": 1031.2
+      },
+      {
+        "epoch": 6,
+        "train_loss": 5.8358,
+        "val_loss": 5.7757,
+        "ppl": 322.36,
+        "bpc": 2.3498,
+        "tok_s": 3139.2,
+        "elapsed_s": 1024.2
+      },
+      {
+        "epoch": 7,
+        "train_loss": 5.6919,
+        "val_loss": 5.6397,
+        "ppl": 281.38,
+        "bpc": 2.2945,
+        "tok_s": 3098.0,
+        "elapsed_s": 1034.2
+      },
+      {
+        "epoch": 8,
+        "train_loss": 5.5611,
+        "val_loss": 5.5247,
+        "ppl": 250.8,
+        "bpc": 2.2476,
+        "tok_s": 3136.5,
+        "elapsed_s": 1023.5
+      }
+    ],
+    "samples": {
+      "The universe is": {
+        "sample": "The universe is a unstuted cuts . \n\n F.SGa , the city 's tuomen , while the same , \" Raton 's in the canuar of Bopbon , I.. C. Jrele . \n\n = = = = = = \n\n",
+        "greedy": "The universe is a funing of the \" . The first time of the first time , and the first time of the first time , and the first time of the first time , and the first time of the first time , and the first time of the first time , and the first time of the first time , and the first"
+      },
+      "She opened the door and": {
+        "sample": "She opened the door and curbes , who was not not a pamer @-@ shrany and silus , and the \" Hote Lellan ( ultica is a first , and the first , and a first single by their wetchles . He was to ounterments , but",
+        "greedy": "She opened the door and the first time , and the first time , and the first time , and the first time of the first time , and the first time of the first time , and the first time of the first time , and the first time of the first time , and the first time of the first time , and the first time of"
+      }
+    },
+    "tokenizer": "/home/emericclement/dev/MFN/tokenizer_wt2"
+  },
+  "dense_mfn": {
+    "tag": "dense_mfn",
+    "model": "dense_mfn",
+    "hidden": 75,
+    "params": 1068046,
+    "epochs": 8,
+    "batch": 64,
+    "seq": 128,
+    "lr": 0.0003,
+    "seed": 0,
+    "threads": 1,
+    "best_val_loss": 5.6186,
+    "test_loss": 5.618,
+    "test_ppl": 275.35,
+    "test_bpc": 2.3148,
+    "tokens_per_char_val": 0.282,
+    "tokens_per_char_test": 0.2856,
+    "history": [
+      {
+        "epoch": 1,
+        "train_loss": 7.3353,
+        "val_loss": 6.8086,
+        "ppl": 905.62,
+        "bpc": 2.77,
+        "tok_s": 3038.7,
+        "elapsed_s": 1063.9
+      },
+      {
+        "epoch": 2,
+        "train_loss": 6.7305,
+        "val_loss": 6.5957,
+        "ppl": 731.95,
+        "bpc": 2.6834,
+        "tok_s": 3115.9,
+        "elapsed_s": 1038.4
+      },
+      {
+        "epoch": 3,
+        "train_loss": 6.4149,
+        "val_loss": 6.2413,
+        "ppl": 513.54,
+        "bpc": 2.5392,
+        "tok_s": 3109.7,
+        "elapsed_s": 1041.6
+      },
+      {
+        "epoch": 4,
+        "train_loss": 6.153,
+        "val_loss": 6.0601,
+        "ppl": 428.43,
+        "bpc": 2.4655,
+        "tok_s": 3117.7,
+        "elapsed_s": 1043.1
+      },
+      {
+        "epoch": 5,
+        "train_loss": 5.9966,
+        "val_loss": 5.9315,
+        "ppl": 376.73,
+        "bpc": 2.4132,
+        "tok_s": 3140.5,
+        "elapsed_s": 1037.6
+      },
+      {
+        "epoch": 6,
+        "train_loss": 5.8703,
+        "val_loss": 5.8107,
+        "ppl": 333.84,
+        "bpc": 2.364,
+        "tok_s": 3167.3,
+        "elapsed_s": 1026.8
+      },
+      {
+        "epoch": 7,
+        "train_loss": 5.7516,
+        "val_loss": 5.7053,
+        "ppl": 300.44,
+        "bpc": 2.3211,
+        "tok_s": 3123.6,
+        "elapsed_s": 1032.6
+      },
+      {
+        "epoch": 8,
+        "train_loss": 5.6507,
+        "val_loss": 5.6186,
+        "ppl": 275.5,
+        "bpc": 2.2859,
+        "tok_s": 3130.2,
+        "elapsed_s": 1037.9
+      }
+    ],
+    "samples": {
+      "The universe is": {
+        "sample": "The universe is his most sreent at the United States , a spin of the series of the time , and to the United States of the sore . At the casters were been in the Sylel . In its toye in the first wusle . The first fotations are to a",
+        "greedy": "The universe is a fun of the first of the first of the first of the first of the first of the first of the first of the first of the first of the first of the first of the first of the first of the first of the first of the first of the first of the first of the first of the first of"
+      },
+      "She opened the door and": {
+        "sample": "She opened the door and he had it in the munion . The episode of Cyet , and ' with a season as a dicmes of the same puel was as \" in Lrekladers , in the United Kingdom , The \" Holar 's first of the hesty ) and",
+        "greedy": "She opened the door and the first of the first of the first of the first of the first of the first of the first of the first of the first of the first of the first of the first of the first of the first of the first of the first of the first of the first of the first of the first of the first of the"
+      }
+    },
+    "tokenizer": "/home/emericclement/dev/MFN/tokenizer_wt2"
+  },
+  "mfndiag_nobidir": {
+    "tag": "mfndiag_nobidir",
+    "model": "mfndiag_nobidir",
+    "hidden": 256,
+    "params": 1050880,
+    "epochs": 8,
+    "batch": 64,
+    "seq": 128,
+    "lr": 0.0003,
+    "seed": 0,
+    "threads": 1,
+    "best_val_loss": 6.4847,
+    "test_loss": 6.4785,
+    "test_ppl": 651.02,
+    "test_bpc": 2.6694,
+    "tokens_per_char_val": 0.282,
+    "tokens_per_char_test": 0.2856,
+    "history": [
+      {
+        "epoch": 1,
+        "train_loss": 7.6617,
+        "val_loss": 7.0397,
+        "ppl": 1141.07,
+        "bpc": 2.864,
+        "tok_s": 2619.2,
+        "elapsed_s": 1220.0
+      },
+      {
+        "epoch": 2,
+        "train_loss": 6.9926,
+        "val_loss": 6.94,
+        "ppl": 1032.73,
+        "bpc": 2.8235,
+        "tok_s": 2649.5,
+        "elapsed_s": 1206.8
+      },
+      {
+        "epoch": 3,
+        "train_loss": 6.8941,
+        "val_loss": 6.8373,
+        "ppl": 932.01,
+        "bpc": 2.7817,
+        "tok_s": 2655.3,
+        "elapsed_s": 1209.6
+      },
+      {
+        "epoch": 4,
+        "train_loss": 6.7957,
+        "val_loss": 6.7496,
+        "ppl": 853.74,
+        "bpc": 2.746,
+        "tok_s": 2667.1,
+        "elapsed_s": 1208.1
+      },
+      {
+        "epoch": 5,
+        "train_loss": 6.713,
+        "val_loss": 6.6777,
+        "ppl": 794.48,
+        "bpc": 2.7167,
+        "tok_s": 2651.4,
+        "elapsed_s": 1215.8
+      },
+      {
+        "epoch": 6,
+        "train_loss": 6.6417,
+        "val_loss": 6.6131,
+        "ppl": 744.81,
+        "bpc": 2.6905,
+        "tok_s": 2623.5,
+        "elapsed_s": 1225.1
+      },
+      {
+        "epoch": 7,
+        "train_loss": 6.5742,
+        "val_loss": 6.5498,
+        "ppl": 699.14,
+        "bpc": 2.6647,
+        "tok_s": 2734.8,
+        "elapsed_s": 1161.7
+      },
+      {
+        "epoch": 8,
+        "train_loss": 6.506,
+        "val_loss": 6.4847,
+        "ppl": 655.03,
+        "bpc": 2.6382,
+        "tok_s": 3753.0,
+        "elapsed_s": 857.9
+      }
+    ],
+    "samples": {
+      "The universe is": {
+        "sample": "The universe is \"ss \" \" \" \" \" \" \" \" \" \" \" \" \" \" \" \" \" \" \" \" \" \" \" \" \"s \" \" \" \" \" \" \" \" \" \" \" \" \" \" \" \" \" \" \" \" \" \" \" \" \" \" \" \" \" \" \" \" \" \" \"",
+        "greedy": "The universe is is is is is is is is is is is is is is is is is is is is is is is is is is is is is is is is is is is is is is is is is is is is is is is is is is is is is is is is is is is is is is is is is"
+      },
+      "She opened the door and": {
+        "sample": "She opened the door and and his a aing a a a a a a a a a a to aly f anding to of the the toedededededed by the the the the the of the the the the the of at the the the the the the the the and in a one the of of the the the",
+        "greedy": "She opened the door and , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , ,"
+      }
+    },
+    "tokenizer": "/home/emericclement/dev/MFN/tokenizer_wt2"
+  },
+  "mfndiag": {
+    "tag": "mfndiag",
+    "model": "mfndiag",
+    "hidden": 256,
+    "params": 1052672,
+    "epochs": 8,
+    "batch": 64,
+    "seq": 128,
+    "lr": 0.0003,
+    "seed": 0,
+    "threads": 1,
+    "best_val_loss": 6.4651,
+    "test_loss": 6.4597,
+    "test_ppl": 638.87,
+    "test_bpc": 2.6616,
+    "tokens_per_char_val": 0.282,
+    "tokens_per_char_test": 0.2856,
+    "history": [
+      {
+        "epoch": 1,
+        "train_loss": 7.6555,
+        "val_loss": 7.0336,
+        "ppl": 1134.08,
+        "bpc": 2.8615,
+        "tok_s": 2557.7,
+        "elapsed_s": 1249.5
+      },
+      {
+        "epoch": 2,
+        "train_loss": 6.9849,
+        "val_loss": 6.9304,
+        "ppl": 1022.89,
+        "bpc": 2.8196,
+        "tok_s": 2598.1,
+        "elapsed_s": 1230.4
+      },
+      {
+        "epoch": 3,
+        "train_loss": 6.8838,
+        "val_loss": 6.8283,
+        "ppl": 923.59,
+        "bpc": 2.778,
+        "tok_s": 2613.6,
+        "elapsed_s": 1227.5
+      },
+      {
+        "epoch": 4,
+        "train_loss": 6.7876,
+        "val_loss": 6.7437,
+        "ppl": 848.72,
+        "bpc": 2.7436,
+        "tok_s": 2625.5,
+        "elapsed_s": 1219.7
+      },
+      {
+        "epoch": 5,
+        "train_loss": 6.7068,
+        "val_loss": 6.672,
+        "ppl": 790.0,
+        "bpc": 2.7144,
+        "tok_s": 2619.0,
+        "elapsed_s": 1222.0
+      },
+      {
+        "epoch": 6,
+        "train_loss": 6.6341,
+        "val_loss": 6.6049,
+        "ppl": 738.68,
+        "bpc": 2.6871,
+        "tok_s": 2624.1,
+        "elapsed_s": 1217.9
+      },
+      {
+        "epoch": 7,
+        "train_loss": 6.5631,
+        "val_loss": 6.5371,
+        "ppl": 690.3,
+        "bpc": 2.6596,
+        "tok_s": 2743.3,
+        "elapsed_s": 1155.7
+      },
+      {
+        "epoch": 8,
+        "train_loss": 6.489,
+        "val_loss": 6.4651,
+        "ppl": 642.34,
+        "bpc": 2.6303,
+        "tok_s": 3706.0,
+        "elapsed_s": 858.7
+      }
+    ],
+    "samples": {
+      "The universe is": {
+        "sample": "The universe is are which a a with a was the the the the of and the the the the of in the the of the to to and is the of the the in the \" of for the of of in the and of the the the the the the the the the the in the , the , , the the ofationation",
+        "greedy": "The universe is is is is is is is is is is is is is is is is is is is is is is is is is is is is is is is is is is is is is is is is is is is is is is is is is is is is is is is is is is is is is is is is is"
+      },
+      "She opened the door and": {
+        "sample": "She opened the door and to \" I toss 's 'ss ' ' ' 's ' ' ' 's 's ' 'sss 'ss 'ssss ' 'ss ' ' ' ' 's ' ' \" ' ' ' ' ' ' ' ' 's ' ' . .s",
+        "greedy": "She opened the door and , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , , ,"
+      }
+    },
+    "tokenizer": "/home/emericclement/dev/MFN/tokenizer_wt2"
+  }
+}

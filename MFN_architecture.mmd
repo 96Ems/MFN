@@ -1,0 +1,74 @@
+flowchart LR
+    T["token t (BPE-4096)"] --> EMB["Embedding V x H<br/>(V=4096, H=144)"]
+
+    EMB --> XP["xp = input_proj(e_t)  H-&gt;H"]
+    EMB --> DLA["decay_Λ MLP d-&gt;H-&gt;H"]
+    EMB --> DPS["decay_Ψ MLP d-&gt;H-&gt;H"]
+    DLA --> ALA["α_Λ = σ(·) ∈ (0,1)^H"]
+    DPS --> APS["α_Ψ = σ(·)^β  (β=0.2, flux lent)"]
+
+    subgraph LAM["Flux expressif Λ  (h_Λ, φ_Λ)"]
+        direction TB
+        GL["g_Ψ→Λ = σ(gate_psi2lam([h_Ψ*, h_Λ*]))"]
+        FL["fb_Λ = fb_lam(h_Λ*) . α_Λ . g_Ψ→Λ"]
+        ML["mix_Λ = xp + fb_Λ + W_Ψ→Λ(h_Ψ*)"]
+        GRL["h_Λ = GRUCell_Λ(mix_Λ, h_Λ)  (12H²)"]
+        PHL["φ_Λ ← γ_Λ·φ_Λ + (1−γ_Λ)·|h_Λ|"]
+        GRL --> PHL
+        FL --> ML
+        ML --> GRL
+    end
+
+    subgraph PSI["Flux conceptuel Ψ  (h_Ψ, φ_Ψ)"]
+        direction TB
+        GPS["g_Λ→Ψ = σ(gate_lam2psi([h_Λ*, h_Ψ*]))"]
+        FPS["fb_Ψ = fb_psi(h_Ψ*) . α_Ψ . g_Λ→Ψ"]
+        MPS["mix_Ψ = xp + fb_Ψ + W_Λ→Ψ(h_Λ*)"]
+        GRPS["h_Ψ = GRUCell_Ψ(mix_Ψ, h_Ψ)  (12H²)"]
+        PHS["φ_Ψ ← γ_Ψ·φ_Ψ + (1−γ_Ψ)·|h_Ψ|"]
+        GRPS --> PHS
+        FPS --> MPS
+        MPS --> GRPS
+    end
+
+    subgraph OUT["Sortie"]
+        direction LR
+        CAT["concat [h_Λ(1−φ_Λ) ; h_Ψ(1−φ_Ψ)]  (2H)"]
+        RD["readout 2H-&gt;H"]
+        LNN["LayerNorm"]
+        HEAD["LM head H x V<br/>(liée à l'embedding)"]
+        LGS["logits → P(next token)"]
+        CAT --> RD --> LNN --> HEAD --> LGS
+    end
+
+    GRL --> CAT
+    GRPS --> CAT
+
+    AL["h_Λ*, φ_Λ  (état t−1)"] --> GL
+    AL --> FL
+    AL --> PHL
+    AL --> CAT
+    PS["h_Ψ*, φ_Ψ  (état t−1)"] --> GPS
+    PS --> FPS
+    PS --> PHS
+    PS --> CAT
+
+    ALA --> FL
+    ALA --> GRL
+    APS --> FPS
+    APS --> GRPS
+    XP --> ML
+    XP --> MPS
+
+    WS["W_Ψ→Λ(h_Ψ*)  (H x H)"] --> ML
+    WL["W_Λ→Ψ(h_Λ* frais)  (H x H)"] --> MPS
+    GRL -. "Λ mis à jour en premier" .-> WL
+
+    GAM["γ_Λ = σ(wγΛ), γ_Ψ = σ(wγΨ)  (récupération par neurone)"] -.-> PHL & PHS
+
+    style EMB fill:#e8f0fe
+    style HEAD fill:#e8f0fe
+    style GRL fill:#fde9d9
+    style GRPS fill:#e6f4ea
+    style PHL fill:#fde9d9
+    style PHS fill:#e6f4ea

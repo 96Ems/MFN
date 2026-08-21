@@ -1,0 +1,225 @@
+{
+  "gpt2mini": {
+    "tag": "gpt2mini",
+    "model": "gpt2mini",
+    "hidden": 120,
+    "params": 1250640,
+    "epochs": 6,
+    "batch": 64,
+    "seq": 128,
+    "lr": 0.001,
+    "seed": 0,
+    "device": "cuda",
+    "best_val_loss": 3.3585,
+    "test_loss": 3.3815,
+    "test_ppl": 29.41,
+    "test_bpc": 1.2333,
+    "history": [
+      {
+        "epoch": 1,
+        "train_loss": 4.2497,
+        "val_loss": 3.6818,
+        "ppl": 39.72,
+        "bpc": 1.3402,
+        "tok_s": 41906.3
+      },
+      {
+        "epoch": 2,
+        "train_loss": 3.581,
+        "val_loss": 3.4976,
+        "ppl": 33.04,
+        "bpc": 1.2731,
+        "tok_s": 42193.4
+      },
+      {
+        "epoch": 3,
+        "train_loss": 3.4641,
+        "val_loss": 3.4334,
+        "ppl": 30.98,
+        "bpc": 1.2497,
+        "tok_s": 42006.3
+      },
+      {
+        "epoch": 4,
+        "train_loss": 3.4117,
+        "val_loss": 3.3968,
+        "ppl": 29.87,
+        "bpc": 1.2364,
+        "tok_s": 42153.0
+      },
+      {
+        "epoch": 5,
+        "train_loss": 3.38,
+        "val_loss": 3.3741,
+        "ppl": 29.2,
+        "bpc": 1.2281,
+        "tok_s": 42148.1
+      },
+      {
+        "epoch": 6,
+        "train_loss": 3.3582,
+        "val_loss": 3.3585,
+        "ppl": 28.75,
+        "bpc": 1.2225,
+        "tok_s": 42211.9
+      }
+    ],
+    "samples": {
+      "Once upon a time,": {
+        "sample": "Once upon a time, was little and was sad Her one theest in village so decided make. had idea show friends family to it\n went anu had idea She to her adventure so could around village Everyone she to her. starteding,ing, even the wanted to there something in village\n day made happy Even she have idea She so could something could that be much.<|endoftext|>",
+        "greedy": "Once upon a time, was little named. loved play his, one, was big strong strong One, he to a. was strong strong strong strong strong strong strong\n day the was He to his. was strong strong strong strong strong strong strong strong strong strong strong\n\n day the was He a strong. was strong strong strong strong strong strong strong strong strong strong strong He.<|endoftext|>"
+      },
+      "The little girl found a": {
+        "sample": "The little girl found a coin her. picked up coin said \"on She it so! you't it She to something\".The girlamed and her girl again smiled\nThats so knew must something special\n took the. went the to shop saw coins some coins the coin She had seen she and very. went to store the, the started the.The boy looking it and to back his. the was that the had a reward The girl so. couldn believe eyes It",
+        "greedy": "The little girl found a and to the. was happy she the girl She the and the girl her had.The girl the was happy she the girl the.<|endoftext|>"
+      },
+      "Tim and his dog were walking in the park when": {
+        "sample": "Tim and his dog were walking in the park when saw big scary. wanted see so., looked and a, they a!The said \"har we all to.\"<|endoftext|>",
+        "greedy": "Tim and his dog were walking in the park when saw big. saw and to and to.\",,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,,"
+      },
+      "The robot wanted to": {
+        "sample": "The robot wanted to. took away them his and them their and them theirs They a at park They with other and.\",,, at,, can play us?\" said robot\nI sorry We not this.'s for robot We't. are. want have back\n, they fun\n look each. smile hug and.\" you have share toy.\" robot.I't to the anymore He. end\n\n\n\n\n hear loud. is.",
+        "greedy": "The robot wanted to the, he to the, he to the. asked robot he help the. robot, he the said \",, can help?\" robot, the said \",,, can help?\" robot, robot,,,,,,,,,,,,,,,,,,,,!\" robot, robot, the, robot the, robot and robot together They the, the, the, robot, the, the, robot the"
+      }
+    },
+    "tokenizer": "/home/emericclement/dev/MFN/phase4/tokenizer_subset"
+  },
+  "mfn_dense": {
+    "tag": "mfn_dense",
+    "model": "mfn_dense",
+    "hidden": 144,
+    "params": 1153440,
+    "epochs": 4,
+    "batch": 64,
+    "seq": 128,
+    "lr": 0.001,
+    "seed": 0,
+    "device": "cuda",
+    "best_val_loss": 2.4013,
+    "test_loss": 2.4163,
+    "test_ppl": 11.2,
+    "test_bpc": 0.8813,
+    "history": [
+      {
+        "epoch": 1,
+        "train_loss": 3.3129,
+        "val_loss": 2.6988,
+        "ppl": 14.86,
+        "bpc": 0.9823,
+        "tok_s": 14171.8
+      },
+      {
+        "epoch": 2,
+        "train_loss": 2.6123,
+        "val_loss": 2.5269,
+        "ppl": 12.51,
+        "bpc": 0.9198,
+        "tok_s": 13698.3
+      },
+      {
+        "epoch": 3,
+        "train_loss": 2.4882,
+        "val_loss": 2.4477,
+        "ppl": 11.56,
+        "bpc": 0.891,
+        "tok_s": 13781.8
+      },
+      {
+        "epoch": 4,
+        "train_loss": 2.4228,
+        "val_loss": 2.4013,
+        "ppl": 11.04,
+        "bpc": 0.8741,
+        "tok_s": 13457.3
+      }
+    ],
+    "samples": {
+      "Once upon a time,": {
+        "sample": "Once upon a time, there was a strong little boy named Tim. Tim liked to play outside and play with his friends. One day, a big boy named Timmy went to the park to see some cool grass.\n\"Hello, Sam,\" he said. \"Do you want to be a good boy?\"\nLily replied, \"Yes, but can I help him?\"\nSo they sat down on the bench and sat in the water. Then, Billy saw a man",
+        "greedy": "Once upon a time, there was a little girl named Lily. She loved to play outside in the sun. One day, she saw a big, shiny rock on the ground. She picked it up and showed it to her mom.\n\"Look, Lily! I found a rock!\" Lily said.\n\"Wow, that's a pretty rock!\" Lily said.\n\"Wow, that's a pretty rock!\" Lily said.\n\"Wow, that's a pretty"
+      },
+      "The little girl found a": {
+        "sample": "The little girl found a big, shiny object in the middle of her family. It was so beautiful and sparkly!\nLucy wanted to make sure it had enough coins, so she decided to put it on and she went back home with the red knob. She was never seen it again before and she felt happy knowing that she had given the coin her own. From then on, she loved the beach.\n<|endoftext|>",
+        "greedy": "The little girl found a big, red ball. She picked it up and put it in her pocket. She put it on the ground and went back to the park.\nThe girl was so happy that she had found a new friend. She was so happy that she had found a new friend. She was so happy that she had found a new friend.\n<|endoftext|>"
+      },
+      "Tim and his dog were walking in the park when": {
+        "sample": "Tim and his dog were walking in the park when they saw a little boy playing with a toy box. He asked Tim if he could touch it. Tim said yes! The boy was very grateful. He put a yellow ball in his pocket and went home.\nThe moral of the story is that if you help others, we can be helpful. And together can make you feel better than before. It is not a fun game but only if they are hurt people.\n<|endoftext|>",
+        "greedy": "Tim and his dog were walking in the park when they saw a big dog. The dog was barking and running around. The dog was scared and ran away.\nThe dog was very scared and ran away. The dog was very sad and scared. He wished he had never played with the dog.\n<|endoftext|>"
+      },
+      "The robot wanted to": {
+        "sample": "The robot wanted to make it for everyone's heart. He tried to find it, but he knew he could not fix it.\nHe asked his mom for help was repair it. His mom nodded her hand and said, \"Sure, but first, I will repair it to the ceiling\". His mommy smiled and ran away from a safe way. When John was done, he kept playing. He felt so happy that he had helped himself a little",
+        "greedy": "The robot wanted to go home. He asked his mom if he could go to the train station. His mom said yes, but he was too busy.\nThe man was very sad. He said he would help his mom. He said he would help his mom and dad. He said he would help him fix the train.\nThe man was very happy. He said, \"Thank you for helping me. I'm proud of you.\"\nThe man smiled and"
+      }
+    },
+    "tokenizer": "/home/emericclement/dev/MFN/phase4/tokenizer_subset"
+  },
+  "gru": {
+    "tag": "gru",
+    "model": "gru",
+    "hidden": 215,
+    "params": 1159710,
+    "epochs": 4,
+    "batch": 64,
+    "seq": 128,
+    "lr": 0.001,
+    "seed": 0,
+    "device": "cuda",
+    "best_val_loss": 2.4351,
+    "test_loss": 2.4493,
+    "test_ppl": 11.58,
+    "test_bpc": 0.8933,
+    "history": [
+      {
+        "epoch": 1,
+        "train_loss": 3.1872,
+        "val_loss": 2.6583,
+        "ppl": 14.27,
+        "bpc": 0.9676,
+        "tok_s": 40814.6
+      },
+      {
+        "epoch": 2,
+        "train_loss": 2.5913,
+        "val_loss": 2.528,
+        "ppl": 12.53,
+        "bpc": 0.9202,
+        "tok_s": 40833.2
+      },
+      {
+        "epoch": 3,
+        "train_loss": 2.4989,
+        "val_loss": 2.4708,
+        "ppl": 11.83,
+        "bpc": 0.8994,
+        "tok_s": 40824.5
+      },
+      {
+        "epoch": 4,
+        "train_loss": 2.4502,
+        "val_loss": 2.4351,
+        "ppl": 11.42,
+        "bpc": 0.8864,
+        "tok_s": 40909.9
+      }
+    ],
+    "samples": {
+      "Once upon a time,": {
+        "sample": "Once upon a time, there was a strong man who lived in a big house. The little girl had a new dress that was very much special for it. One day, she saw a new friend at the shop and they decided to take a trip with her camera. They felt so much fun on the trips.\nWhen they arrived at the park, they found a nice man sitting next time. The man said, \"I'm so glad you got up here with",
+        "greedy": "Once upon a time, there was a little girl named Lily. She loved to play outside in the sunshine. One day, she saw a big, scary dog. The dog was scared and ran away.\nLily's mom saw her and said, \"Don't worry, Lily. We can help you find your way home.\"\nLily was happy to help her friend, but she was also happy to help her friend. She went to the park and saw a big tree"
+      },
+      "The little girl found a": {
+        "sample": "The little girl found a big, shiny object in the middle of it. She was so proud that she had created something amazing!\nFrom that day on, she made sure to keep her special jewel and she should never take a break. One day the owner was playing with a new toy and it was a very popular game. The girl was so happy to have her own marbles back to play.\n<|endoftext|>",
+        "greedy": "The little girl found a big, red ball. She was so happy to have it. She thanked the dog and ran away with the ball.\nThe little girl was so happy that she had a new friend. She was so happy to have a new friend.\n<|endoftext|>"
+      },
+      "Tim and his dog were walking in the park when": {
+        "sample": "Tim and his dog were walking in the park when they saw their new friend. They played tag, on a race with each other, and they played with the ball every day.\nOne day, they went to a big store with many toys. The boy was not so excited about it. He said, \"Let's go play in this place!\" Tim said, \"Sure, but only have one is too heavy for you.\"\nThey get on the car and turns to make it zoom our",
+        "greedy": "Tim and his dog were walking in the park when they saw a big dog. The dog was very friendly and said, \"Hello, dog! Do you want to play with me?\"\nThe dog barked and wagged its tail. The dog barked and wagged its tail. The dog barked and wagged its tail. The dog was happy to have a new friend.\n<|endoftext|>"
+      },
+      "The robot wanted to": {
+        "sample": "The robot wanted to play in the dark room. He wanted to have fun.\nHe waited for a long time, until he finally arrived at the door. He was so sad that he began to cry.\nHis teacher was angry and shouted for him. She tried to get him better than the switch. And then, she had to help him. She was happy to be there. She quickly hid behind her toys to keep him safe.\nTom felt relieved,",
+        "greedy": "The robot wanted to play with it. He asked his mom if he could borrow it. His mom said yes and gave him a big hug.\nThe boy was very happy. He said, \"Thank you, I'm so happy you are my friend.\"\nThe boy was so happy that he had done his work. He thanked the man and said, \"Thank you for helping me fix the robot. You are very kind and helpful. You are very kind and"
+      }
+    },
+    "tokenizer": "/home/emericclement/dev/MFN/phase4/tokenizer_subset"
+  }
+}

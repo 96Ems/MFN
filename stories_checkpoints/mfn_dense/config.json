@@ -1,0 +1,23 @@
+{
+  "architectures": [
+    "MFNDenseForCausalLM"
+  ],
+  "auto_map": {
+    "AutoConfig": "lm2.MFNDenseConfig",
+    "AutoModelForCausalLM": "lm2.MFNDenseForCausalLM"
+  },
+  "beta": 0.2,
+  "bos_token_id": 0,
+  "dropout": 0.0,
+  "dtype": "float32",
+  "eos_token_id": 0,
+  "hidden_size": 144,
+  "initializer_range": 0.02,
+  "model_type": "mfn_dense_lm",
+  "no_bidir": false,
+  "no_fatigue": false,
+  "pad_token_id": 0,
+  "tie_word_embeddings": true,
+  "transformers_version": "5.15.1",
+  "vocab_size": 4096
+}
