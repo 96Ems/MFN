@@ -38,7 +38,23 @@ def run_epoch(model, train_ids, optimizer, args, device):
     y = train_ids[1:L + 1].view(args.batch, -1, args.seq)
     steps = x.shape[1] if not args.limit_steps else min(x.shape[1], args.limit_steps)
     warmup = 200
-    total, n_tok, t0, nan_steps = 0.0, 0, time.time(), 0
+    total, n_tok, t0, bad_steps = 0.0, 0, time.time(), 0
+    ema = None
+    # Ombre des poids : jamais touchée avant un step *réussi* -> permet de
+    # rollback si un batch aberrant (loss NaN / outlier / grad NaN) tente de
+    # corrompre l'état. Un mauvais batch ne peut plus faire diverger le run.
+    with torch.no_grad():
+        shadow = [p.detach().clone() for p in model.parameters()]
+
+    def rollback():
+        with torch.no_grad():
+            for p, sp in zip(model.parameters(), shadow):
+                p.copy_(sp)
+
+    def abort(why):
+        raise SystemExit(f"ABORT: {why} ({bad_steps} steps mauvais consécutifs) "
+                         f"— lower --lr ou inspecter les données")
+
     for s in range(steps):
         lr = args.lr * (s + 1) / warmup if s < warmup else \
             args.lr * 0.5 * (1 + np.cos(np.pi * min((s - warmup) / max(steps * args.epochs - warmup, 1), 1)))
@@ -46,29 +62,41 @@ def run_epoch(model, train_ids, optimizer, args, device):
             g["lr"] = lr
         out = model(x[:, s].to(device), labels=y[:, s].to(device), return_dict=True)
         loss = out.loss
-        if not torch.isfinite(loss):
-            nan_steps += 1
-            print(f"    step {s}: NON-FINITE loss, skipping "
-                  f"({nan_steps} consecutive)", flush=True)
+        li = loss.item()
+        outlier = ema is not None and li > 4.0 * ema + 4.0
+        if not torch.isfinite(loss) or outlier:
+            bad_steps += 1
+            why = "NON-FINITE loss" if not torch.isfinite(loss) else \
+                  f"outlier loss {li:.1f} (EMA {ema:.2f})"
+            print(f"    step {s}: {why}, rollback + skip "
+                  f"({bad_steps} consécutifs)", flush=True)
+            rollback()
             optimizer.zero_grad(set_to_none=True)
-            if nan_steps >= 3:
-                raise SystemExit("ABORT: repeated non-finite loss "
-                                 "(divergence) — lower --lr")
+            if bad_steps >= 50:
+                abort("divergence détectée par rollback")
             continue
-        nan_steps = 0
+        bad_steps = 0
+        ema = li if ema is None else 0.99 * ema + 0.01 * li
         optimizer.zero_grad(set_to_none=True)
         loss.backward()
         gn = torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
         if not torch.isfinite(gn):
-            print(f"    step {s}: non-finite grad norm, skipping step",
-                  flush=True)
+            bad_steps += 1
+            print(f"    step {s}: non-finite grad norm, rollback + skip "
+                  f"({bad_steps} consécutifs)", flush=True)
+            rollback()
             optimizer.zero_grad(set_to_none=True)
+            if bad_steps >= 50:
+                abort("divergence détectée par grad NaN")
             continue
         optimizer.step()
-        total += loss.item() * y[:, s].numel()
+        with torch.no_grad():
+            for p, sp in zip(model.parameters(), shadow):
+                sp.copy_(p)
+        total += li * y[:, s].numel()
         n_tok += y[:, s].numel()
         if s % 250 == 0:
-            print(f"    step {s}/{steps} loss {loss.item():.4f} [{time.time()-t0:.0f}s]", flush=True)
+            print(f"    step {s}/{steps} loss {li:.4f} [{time.time()-t0:.0f}s]", flush=True)
     return total / n_tok, n_tok / (time.time() - t0)
 
 
@@ -99,6 +127,9 @@ def main():
     ap.add_argument("--limit-steps", type=int, default=0)
     ap.add_argument("--out", default="results_deep.json")
     ap.add_argument("--tag", default=None)
+    ap.add_argument("--resume", action="store_true",
+                    help="reprendre depuis phase5/checkpoints/<tag> "
+                         "(epoch 1 supposé fait, epochs restantes 2..N)")
     args = ap.parse_args()
 
     torch.set_num_threads(args.threads)
@@ -114,7 +145,24 @@ def main():
 
     kw = ARCHES[args.arch]
     tag = args.tag or f"deep_{args.arch}"
-    model = build_deep(tag, vocab, **kw).to(device)
+    ckpt_dir = os.path.join(CKPT, tag)
+    # Epoch 1 du run deep_2l interrompu (log p5_2l.log, run du 21/08/2026) —
+    # backfillé pour garder un historique complet dans results_deep.json.
+    BACKFILL_EP1 = {"2l": {"epoch": 1, "train_loss": 3.6595, "val_loss": 3.0371,
+                           "ppl": 20.84, "bpc": 1.1055, "tok_s": 5993.0}}
+    if args.resume and os.path.isdir(ckpt_dir):
+        model = MFNDeepForCausalLM.from_pretrained(ckpt_dir).to(device)
+        start_ep = 2
+        history = [BACKFILL_EP1[args.arch]] if args.arch in BACKFILL_EP1 else []
+        print(f"[{tag}] RESUMING from {ckpt_dir} — epoch 1 fait, "
+              f"reprise à l'epoch {start_ep}", flush=True)
+    else:
+        if args.resume:
+            print(f"[{tag}] --resume mais pas de checkpoint -> init fraîche",
+                  flush=True)
+        model = build_deep(tag, vocab, **kw).to(device)
+        start_ep = 1
+        history = []
     n_params = true_param_count(model)
     print(f"[{tag}] widths={kw['widths']} skip={kw['skip_fb']} "
           f"topdown={kw['topdown']} params={n_params} epochs={args.epochs} "
@@ -122,8 +170,8 @@ def main():
 
     optimizer = torch.optim.AdamW([p for p in model.parameters() if p.requires_grad],
                                   lr=args.lr, betas=(0.9, 0.999), weight_decay=0.1)
-    best_val, history = float("inf"), []
-    for ep in range(1, args.epochs + 1):
+    best_val, history = float("inf"), history
+    for ep in range(start_ep, args.epochs + 1):
         t0 = time.time()
         train_loss, tok_s = run_epoch(model, train_ids, optimizer, args, device)
         val_loss = evaluate(model, val_ids, device)

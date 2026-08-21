@@ -3,12 +3,14 @@
 set -u
 cd "$(dirname "$0")"
 LOGF=../logs/p5
+RESUME_FLAG=""
+[ "${RESUME:-0}" = "1" ] && RESUME_FLAG="--resume"
 for spec in "2l 4" "3l 3"; do
   set -- $spec
   a=$1; ep=$2
   echo "=== deep_$a (epochs=$ep) $(date)" >> ../logs/p5_queue.log
   env OMP_NUM_THREADS=2 ../.venv/bin/python -u train_deep.py \
-    --arch "$a" --epochs "$ep" --cuda --out results_deep.json \
+    --arch "$a" --epochs "$ep" --cuda --out results_deep.json $RESUME_FLAG \
     > "$LOGF"_"$a".log 2>&1
   echo "=== done deep_$a exit=$? $(date)" >> ../logs/p5_queue.log
 done
