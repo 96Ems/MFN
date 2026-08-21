@@ -40,10 +40,43 @@ externe ré-entraîné.
    emb-vs-non-emb → nos exposants à 0.5-8M params sont **indicatifs** (pente
    locale), pas une preuve globale.
 
-## Analyse (à remplir quand P1-P2 sortent)
+## Analyse — 1ère ébauche (21 août, avant fin de deep_2l)
 
-- Fit `log val_loss vs log params` sur les points disponibles : α_MFN = ?
-- α ≷ 0.076 (référence transformers) ?
-- Ajustement compute : loss vs FLOPs (tok/s mesurés × params × steps).
-- Conclusion prudente (courbure petite échelle) + suite recommandée (>100M
-  params = cluster) si la pente est prometteuse.
+Voir `scaling_curve.png` (panneau A : axe taille ; panneau B : axe données).
+
+### Axe données (exposants locaux α_D, mêmes modèles, même jeu)
+| Modèle | Params | α_D (4 ep) | α_D (toutes ep) | Val ep4 |
+|---|---:|---:|---:|---:|
+| **MFN 1L** | 1 153 440 | **0.085** | 0.085 | 2.4013 |
+| GRU 1L | 1 159 710 | 0.064 | 0.064 | 2.4351 |
+| GPT-2 mini | 1 250 640 | 0.059 | 0.051 | 3.3585 |
+
+→ **MFN tire le plus de chaque token** : α_D ~33% plus raide que GRU et ~65%
+que GPT-2 mini (référence littérature : Kaplan α_D = 0.095). C'est le premier
+signal chiffré de « barrière déplacée » — sur l'axe données.
+
+### Axe taille (points convergés, mêmes 22.6M tokens)
+| Modèle | Params | Val loss | Δ vs MFN |
+|---|---:|---:|---:|
+| **MFN 1L** | 1 153 440 | **2.4013** | — |
+| GRU 1L | 1 159 710 | 2.4351 | +0.034 (≈ même N) |
+| GPT-2 mini | 1 250 640 | 3.3585 | +0.96 (≈ même N) |
+| deep_2l | 2 122 368 | (ep1 : 3.0371, en cours) | — |
+
+### Prévision falsifiable — fin de deep_2l cette nuit
+Depuis P0 (mfn 1L, 2.4013) avec la pente transformers α_N :
+- α=0.057 (params totaux) → **2.32** ; α=0.076 → **2.29** ; α=0.095 → **2.27**
+- α=0.076 en non-emb (ratio 2.37×) → **2.25** ; α=0.095 non-emb → **2.21**
+
+**Lecture prévue** : ep4 val ≈ 2.25-2.32 → MFN suit la pente transformers
+(α≈0.076) ; < ~2.25 → indice de pente plus raide (barrière déplacée) ;
+≈ 2.40 → la profondeur n'apporte rien à cette échelle. [Réserve : deep_2l
+tourne à lr 5e-4 vs 1e-3 pour P0, écart de convergence attendu ~0.01-0.03.]
+
+### Suite
+- Fit `log val_loss vs log params` complet quand P1 (deep_2l) et P2 (deep_3l)
+  sortent : α_MFN vs 0.076.
+- Ajustement compute : loss vs FLOPs (tok/s mesurés × params × steps) — déjà
+  noté : MFN 5.99k tok/s vs GRU 40.8k (lourd en calcul par token, à pondérer).
+- Conclusion prudente (courbure petite échelle) ; preuve définitive >100M
+  params = cluster.
