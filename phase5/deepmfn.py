@@ -1,0 +1,269 @@
+"""MFN deep stack with inter-layer feedback (phase 5).
+
+Each layer is a dual-stream core (lambda/fast + psi/slow, per the paper) of
+configurable width H_l. Two extra couplings, in the spirit of the paper's
+bidirectional confidence gating but *between layers*:
+
+  - top-down:  the deeper layer's readout y_{l+1} (at t-1) is projected to
+               H_l and added (per-neuron gated) to both streams of layer l;
+  - skip:      with skip_fb=True, layer 0's readout also feeds non-adjacent
+               deeper layers (surface -> deep long-range feedback).
+
+The layer-0 width fixes the embedding/head dims; the final layer's 2H_L
+readout is bottlenecked to H_0 so the LM head stays tied to the embedding.
+"""
+import torch
+import torch.nn as nn
+from transformers import (
+    AutoConfig, AutoModelForCausalLM, GenerationMixin, PretrainedConfig,
+    PreTrainedModel,
+)
+from transformers.modeling_outputs import CausalLMOutput
+
+from mfn_lm import RecurrentStateCacheMixin
+
+
+class MFNDeepConfig(PretrainedConfig):
+    model_type = "mfn_deep_lm"
+
+    def __init__(
+        self,
+        vocab_size: int = 4096,
+        layer_widths=None,
+        beta: float = 0.2,
+        topdown: bool = True,
+        skip_fb: bool = False,
+        dropout: float = 0.0,
+        initializer_range: float = 0.02,
+        **kwargs,
+    ):
+        self.vocab_size = vocab_size
+        self.layer_widths = list(layer_widths) if layer_widths else [192, 96]
+        self.beta = beta
+        self.topdown = topdown
+        self.skip_fb = skip_fb
+        self.dropout = dropout
+        self.initializer_range = initializer_range
+        self.tie_word_embeddings = True
+        self.eos_token_id = 0
+        self.pad_token_id = 0
+        self.bos_token_id = 0
+        super().__init__(**kwargs)
+
+
+class MFNDeepLayer(nn.Module):
+    """One dual-stream layer of width H with optional inter-layer feedback."""
+
+    def __init__(self, h_in, H, h_td=None, h_skip=None, beta=0.2):
+        super().__init__()
+        self.H = H
+        self.beta = beta
+        self.input_proj = nn.Linear(h_in, H)
+
+        self.decay_lam = nn.Sequential(
+            nn.Linear(h_in, H), nn.ReLU(), nn.Linear(H, H), nn.Sigmoid())
+        self.decay_psi = nn.Sequential(
+            nn.Linear(h_in, H), nn.ReLU(), nn.Linear(H, H), nn.Sigmoid())
+
+        self.fb_lam = nn.Linear(H, H)
+        self.fb_psi = nn.Linear(H, H)
+        self.W_psi2lam = nn.Linear(H, H, bias=False)
+        self.W_lam2psi = nn.Linear(H, H, bias=False)
+        self.gate_psi2lam = nn.Sequential(nn.Linear(2 * H, H), nn.Sigmoid())
+        self.gate_lam2psi = nn.Sequential(nn.Linear(2 * H, H), nn.Sigmoid())
+
+        self.gru_lam = nn.GRUCell(H, H)
+        self.gru_psi = nn.GRUCell(H, H)
+        self.w_gamma_lam = nn.Parameter(torch.zeros(H))
+        self.w_gamma_psi = nn.Parameter(torch.zeros(H))
+
+        self.readout = nn.Linear(2 * H, H)
+
+        # inter-layer couplings (per-neuron confidence gates, diagonal)
+        if h_td is not None:
+            self.W_td = nn.Linear(h_td, H)
+            self.td_lam_u = nn.Parameter(torch.zeros(H))
+            self.td_lam_v = nn.Parameter(torch.zeros(H))
+            self.td_lam_b = nn.Parameter(torch.zeros(H))
+            self.td_psi_u = nn.Parameter(torch.zeros(H))
+            self.td_psi_v = nn.Parameter(torch.zeros(H))
+            self.td_psi_b = nn.Parameter(torch.zeros(H))
+        if h_skip is not None:
+            self.W_sk = nn.Linear(h_skip, H)
+            self.sk_lam_u = nn.Parameter(torch.zeros(H))
+            self.sk_lam_v = nn.Parameter(torch.zeros(H))
+            self.sk_lam_b = nn.Parameter(torch.zeros(H))
+            self.sk_psi_u = nn.Parameter(torch.zeros(H))
+            self.sk_psi_v = nn.Parameter(torch.zeros(H))
+            self.sk_psi_b = nn.Parameter(torch.zeros(H))
+
+    @staticmethod
+    def init_state(batch, H, device="cpu"):
+        z = lambda: torch.zeros(batch, H, device=device)
+        return z(), z(), z(), z(), z()  # h_lam, h_psi, phi_lam, phi_psi, y
+
+    def forward(self, u, st, y_td, y_sk):
+        """u: input (h_in); st: (h_lam, h_psi, phi_lam, phi_psi, y_prev);
+        y_td / y_sk: feedback readouts (or None)."""
+        h_lam, h_psi, phi_lam, phi_psi, _ = st
+        gamma_lam = torch.sigmoid(self.w_gamma_lam)
+        gamma_psi = torch.sigmoid(self.w_gamma_psi)
+        h_lam_eff = h_lam * (1.0 - phi_lam)
+        h_psi_eff = h_psi * (1.0 - phi_psi)
+
+        xp = self.input_proj(u)
+        alpha_lam = self.decay_lam(u)
+        alpha_psi = self.decay_psi(u) ** self.beta
+
+        g_p2l = self.gate_psi2lam(torch.cat([h_psi_eff, h_lam_eff], dim=-1))
+        g_l2p = self.gate_lam2psi(torch.cat([h_lam_eff, h_psi_eff], dim=-1))
+        fb_lam = self.fb_lam(h_lam_eff) * alpha_lam * g_p2l
+        fb_psi = self.fb_psi(h_psi_eff) * alpha_psi * g_l2p
+
+        mix_lam = xp + fb_lam + self.W_psi2lam(h_psi_eff)
+        if y_td is not None:  # top-down: deeper layer (t-1)
+            td = self.W_td(y_td)
+            g = torch.sigmoid(self.td_lam_u * h_lam_eff
+                              + self.td_lam_v * td + self.td_lam_b)
+            mix_lam = mix_lam + g * td
+        if y_sk is not None:  # skip: layer-0 readout (same step)
+            sk = self.W_sk(y_sk)
+            g = torch.sigmoid(self.sk_lam_u * h_lam_eff
+                              + self.sk_lam_v * sk + self.sk_lam_b)
+            mix_lam = mix_lam + g * sk
+
+        h_lam = self.gru_lam(mix_lam, h_lam)
+
+        # psi uses the FRESH lambda state; feedback terms enter psi's mix too
+        h_lam_star = h_lam * (1.0 - phi_lam)
+        mix_psi = xp + fb_psi + self.W_lam2psi(h_lam_star)
+        if y_td is not None:
+            g = torch.sigmoid(self.td_psi_u * h_psi_eff
+                              + self.td_psi_v * td + self.td_psi_b)
+            mix_psi = mix_psi + g * td
+        if y_sk is not None:
+            g = torch.sigmoid(self.sk_psi_u * h_psi_eff
+                              + self.sk_psi_v * sk + self.sk_psi_b)
+            mix_psi = mix_psi + g * sk
+
+        h_psi = self.gru_psi(mix_psi, h_psi)
+
+        phi_lam = gamma_lam * phi_lam + (1.0 - gamma_lam) * h_lam.abs()
+        phi_psi = gamma_psi * phi_psi + (1.0 - gamma_psi) * h_psi.abs()
+        h_lam_out = h_lam * (1.0 - phi_lam)
+        h_psi_out = h_psi * (1.0 - phi_psi)
+        y = self.readout(torch.cat([h_lam_out, h_psi_out], dim=-1))
+        return (h_lam, h_psi, phi_lam, phi_psi, y)
+
+
+class MFNDeepStack(nn.Module):
+    def __init__(self, config):
+        super().__init__()
+        w = config.layer_widths
+        self.widths = w
+        self.layers = nn.ModuleList()
+        for l, H in enumerate(w):
+            h_in = w[l - 1] if l > 0 else H
+            h_td = w[l + 1] if (config.topdown and l < len(w) - 1) else None
+            h_sk = w[0] if (config.skip_fb and l >= 2) else None
+            self.layers.append(MFNDeepLayer(h_in, H, h_td, h_sk, config.beta))
+        self.final_proj = nn.Linear(2 * w[-1], w[0])
+
+    def init_state(self, batch, device="cpu"):
+        return [lay.init_state(batch, lay.H, device) for lay in self.layers]
+
+    def step(self, emb, states):
+        """One timestep: sequential shallow -> deep pass with feedback.
+        top-down uses the deeper layer's y at t-1 (slow); skip uses layer-0's
+        y of the current step (fast surface guides deep within the step)."""
+        new_states, y_l = [], None
+        y0_fresh = None
+        for l, (lay, st) in enumerate(zip(self.layers, states)):
+            u = emb if l == 0 else y_l
+            y_td = states[l + 1][4] if hasattr(lay, "W_td") else None
+            y_sk = y0_fresh if hasattr(lay, "W_sk") else None
+            st_new = lay(u, st, y_td, y_sk)
+            new_states.append(st_new)
+            y_l = st_new[4]
+            if l == 0:
+                y0_fresh = st_new[4]
+        return new_states, y_l
+
+
+class MFNDeepForCausalLM(RecurrentStateCacheMixin, PreTrainedModel, GenerationMixin):
+    config_class = MFNDeepConfig
+    _tied_weights_keys = {"lm_head.weight": "embed_tokens.weight"}
+
+    def __init__(self, config):
+        super().__init__(config)
+        H0 = config.layer_widths[0]
+        self.embed_tokens = nn.Embedding(config.vocab_size, H0)
+        self.stack = MFNDeepStack(config)
+        self.ln = nn.LayerNorm(H0)
+        self.lm_head = nn.Linear(H0, config.vocab_size, bias=False)
+        self.lm_head.weight = self.embed_tokens.weight
+        self.post_init()
+
+    def get_input_embeddings(self):
+        return self.embed_tokens
+
+    def set_input_embeddings(self, value):
+        self.embed_tokens = value
+
+    def get_output_embeddings(self):
+        return self.lm_head
+
+    def set_output_embeddings(self, value):
+        self.lm_head = value
+
+    def forward(self, input_ids=None, state=None, labels=None,
+                return_dict=None, attention_mask=None, **kwargs):
+        return_dict = return_dict if return_dict is not None else True
+        emb = self.embed_tokens(input_ids)
+
+        if state is not None:
+            if emb.shape[1] > 1:
+                emb = emb[:, -1:]
+            states, _ = self.stack.step(emb[:, 0], state)
+            hout = self.stack.final_proj(
+                torch.cat([states[-1][0] * (1 - states[-1][2]),
+                           states[-1][1] * (1 - states[-1][3])], dim=-1))
+            logits = self.lm_head(self.ln(hout))[:, None]
+            return CausalLMOutput(logits=logits, hidden_states=tuple(states))
+
+        states = self.stack.init_state(emb.shape[0], emb.device)
+        logits = []
+        for t in range(emb.shape[1]):
+            states, _ = self.stack.step(emb[:, t], states)
+            last = states[-1]
+            hout = self.stack.final_proj(
+                torch.cat([last[0] * (1 - last[2]), last[1] * (1 - last[3])],
+                          dim=-1))
+            logits.append(self.lm_head(self.ln(hout)))
+        logits = torch.stack(logits, dim=1)
+
+        loss = None
+        if labels is not None:
+            loss = nn.functional.cross_entropy(
+                logits.reshape(-1, logits.shape[-1]), labels.reshape(-1))
+        if not return_dict:
+            return ((loss,) if loss is not None else tuple()) + (logits,)
+        return CausalLMOutput(loss=loss, logits=logits,
+                              hidden_states=tuple(states))
+
+
+def build_deep(model_id: str, vocab_size: int, widths, beta=0.2,
+               topdown=True, skip_fb=False):
+    cfg = MFNDeepConfig(vocab_size=vocab_size, layer_widths=widths, beta=beta,
+                        topdown=topdown, skip_fb=skip_fb)
+    return MFNDeepForCausalLM(cfg)
+
+
+def register_auto():
+    AutoConfig.register(MFNDeepConfig.model_type, MFNDeepConfig)
+    AutoModelForCausalLM.register(MFNDeepConfig, MFNDeepForCausalLM)
+
+
+register_auto()
+MFNDeepConfig.register_for_auto_class("AutoConfig")
+MFNDeepForCausalLM.register_for_auto_class("AutoModelForCausalLM")
