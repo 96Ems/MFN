@@ -38,7 +38,7 @@ def run_epoch(model, train_ids, optimizer, args, device):
     y = train_ids[1:L + 1].view(args.batch, -1, args.seq)
     steps = x.shape[1] if not args.limit_steps else min(x.shape[1], args.limit_steps)
     warmup = 200
-    total, n_tok, t0 = 0.0, 0, time.time()
+    total, n_tok, t0, nan_steps = 0.0, 0, time.time(), 0
     for s in range(steps):
         lr = args.lr * (s + 1) / warmup if s < warmup else \
             args.lr * 0.5 * (1 + np.cos(np.pi * min((s - warmup) / max(steps * args.epochs - warmup, 1), 1)))
@@ -46,9 +46,24 @@ def run_epoch(model, train_ids, optimizer, args, device):
             g["lr"] = lr
         out = model(x[:, s].to(device), labels=y[:, s].to(device), return_dict=True)
         loss = out.loss
+        if not torch.isfinite(loss):
+            nan_steps += 1
+            print(f"    step {s}: NON-FINITE loss, skipping "
+                  f"({nan_steps} consecutive)", flush=True)
+            optimizer.zero_grad(set_to_none=True)
+            if nan_steps >= 3:
+                raise SystemExit("ABORT: repeated non-finite loss "
+                                 "(divergence) — lower --lr")
+            continue
+        nan_steps = 0
         optimizer.zero_grad(set_to_none=True)
         loss.backward()
-        torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+        gn = torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+        if not torch.isfinite(gn):
+            print(f"    step {s}: non-finite grad norm, skipping step",
+                  flush=True)
+            optimizer.zero_grad(set_to_none=True)
+            continue
         optimizer.step()
         total += loss.item() * y[:, s].numel()
         n_tok += y[:, s].numel()
@@ -77,7 +92,7 @@ def main():
     ap.add_argument("--epochs", type=int, default=4)
     ap.add_argument("--batch", type=int, default=64)
     ap.add_argument("--seq", type=int, default=128)
-    ap.add_argument("--lr", type=float, default=1e-3)
+    ap.add_argument("--lr", type=float, default=5e-4)
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--threads", type=int, default=2)
     ap.add_argument("--cuda", action="store_true")
