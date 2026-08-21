@@ -113,7 +113,11 @@ class MFNDeepLayer(nn.Module):
 
         xp = self.input_proj(u)
         alpha_lam = self.decay_lam(u)
-        alpha_psi = self.decay_psi(u) ** self.beta
+        # FIX NaN backward : sigmoid(z)**beta a une dérivée infinie quand
+        # sigmoid -> 0.0 (fp32), ce qui infecte le backward en NaN (zone de
+        # divergence ~step2000, puis ~97% des steps en ep3-4). clamp_min garde
+        # le forward identique (x^0.2 ≈ 0 pour x<1e-6) et tue le pic de dérivée.
+        alpha_psi = self.decay_psi(u).clamp_min(1e-6) ** self.beta
 
         g_p2l = self.gate_psi2lam(torch.cat([h_psi_eff, h_lam_eff], dim=-1))
         g_l2p = self.gate_lam2psi(torch.cat([h_lam_eff, h_psi_eff], dim=-1))

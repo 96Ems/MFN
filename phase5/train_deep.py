@@ -127,9 +127,10 @@ def main():
     ap.add_argument("--limit-steps", type=int, default=0)
     ap.add_argument("--out", default="results_deep.json")
     ap.add_argument("--tag", default=None)
-    ap.add_argument("--resume", action="store_true",
-                    help="reprendre depuis phase5/checkpoints/<tag> "
-                         "(epoch 1 supposé fait, epochs restantes 2..N)")
+    ap.add_argument("--start-epoch", type=int, default=1,
+                    help="epoch de reprise (1 par défaut). >1 -> charge le "
+                         "checkpoint phase5/checkpoints/<tag> et backfill "
+                         "l'historique des epochs déjà faites")
     args = ap.parse_args()
 
     torch.set_num_threads(args.threads)
@@ -146,22 +147,23 @@ def main():
     kw = ARCHES[args.arch]
     tag = args.tag or f"deep_{args.arch}"
     ckpt_dir = os.path.join(CKPT, tag)
-    # Epoch 1 du run deep_2l interrompu (log p5_2l.log, run du 21/08/2026) —
+    # Historique des epochs 1-2 du run deep_2l interrompu (logs p5_2l.log) —
     # backfillé pour garder un historique complet dans results_deep.json.
-    BACKFILL_EP1 = {"2l": {"epoch": 1, "train_loss": 3.6595, "val_loss": 3.0371,
-                           "ppl": 20.84, "bpc": 1.1055, "tok_s": 5993.0}}
-    if args.resume and os.path.isdir(ckpt_dir):
+    BACKFILL = {"2l": [{"epoch": 1, "train_loss": 3.6595, "val_loss": 3.0371,
+                        "ppl": 20.84, "bpc": 1.1055, "tok_s": 5993.0},
+                       {"epoch": 2, "train_loss": 2.9341, "val_loss": 2.8161,
+                        "ppl": 16.71, "bpc": 1.0250, "tok_s": 5318.0}]}
+    if args.start_epoch > 1 and os.path.isdir(ckpt_dir):
         model = MFNDeepForCausalLM.from_pretrained(ckpt_dir).to(device)
-        start_ep = 2
-        history = [BACKFILL_EP1[args.arch]] if args.arch in BACKFILL_EP1 else []
-        print(f"[{tag}] RESUMING from {ckpt_dir} — epoch 1 fait, "
-              f"reprise à l'epoch {start_ep}", flush=True)
+        history = [e for e in BACKFILL.get(args.arch, [])
+                   if e["epoch"] < args.start_epoch]
+        print(f"[{tag}] RESUMING from {ckpt_dir} — reprise à l'epoch "
+              f"{args.start_epoch}", flush=True)
     else:
-        if args.resume:
-            print(f"[{tag}] --resume mais pas de checkpoint -> init fraîche",
-                  flush=True)
+        if args.start_epoch > 1:
+            print(f"[{tag}] --start-epoch {args.start_epoch} mais pas de "
+                  f"checkpoint -> init fraîche", flush=True)
         model = build_deep(tag, vocab, **kw).to(device)
-        start_ep = 1
         history = []
     n_params = true_param_count(model)
     print(f"[{tag}] widths={kw['widths']} skip={kw['skip_fb']} "
@@ -171,7 +173,7 @@ def main():
     optimizer = torch.optim.AdamW([p for p in model.parameters() if p.requires_grad],
                                   lr=args.lr, betas=(0.9, 0.999), weight_decay=0.1)
     best_val, history = float("inf"), history
-    for ep in range(start_ep, args.epochs + 1):
+    for ep in range(args.start_epoch, args.epochs + 1):
         t0 = time.time()
         train_loss, tok_s = run_epoch(model, train_ids, optimizer, args, device)
         val_loss = evaluate(model, val_ids, device)
