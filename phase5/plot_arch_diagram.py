@@ -1,135 +1,165 @@
 #!/usr/bin/env python
-"""Figure 2 du papier : schémas comparatifs des architectures (style
-boule/lien) — GRU vs MFN 1L vs MFN 3L vs MFN 3L3T. Sortie PDF vectorielle.
-"""
+"""Figure 1 du papier : schémas comparatifs (GRU / MFN 1L / 3L / 3L3T).
+Design propre : grille 10x7.8 par panneau, aucune rotation de texte,
+légende globale, couleurs sémantiques (vert=entrée, orange=λ, bleu=ψ,
+rouge=sortie, violet pointillé=top-down, gris point-tiret=latéral)."""
 import os
-BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # racine repo
 import matplotlib
 matplotlib.use("Agg")
 import matplotlib.pyplot as plt
-from matplotlib.patches import Circle, FancyBboxPatch, FancyArrowPatch, Rectangle
+from matplotlib.patches import Circle, FancyBboxPatch, FancyArrowPatch
 
-C_LAM, C_PSI = "#dd8452", "#4c72b0"   # flux rapide / lent
-C_IN, C_OUT, C_FB = "#55a868", "#c44e52", "#8172b3"
+BASE = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+C_IN, C_LAM, C_PSI, C_OUT = "#55a868", "#dd8452", "#4c72b0", "#c44e52"
+C_TD, C_LAT = "#8172b3", "0.45"
 
-fig, axs = plt.subplots(2, 2, figsize=(12.5, 9.6))
+def ball(ax, x, y, r, color, text=None, fs=9):
+    ax.add_patch(Circle((x, y), r, fc=color, ec="k", lw=1.4, zorder=5))
+    if text:
+        ax.text(x, y, text, ha="center", va="center", fontsize=fs,
+                color="white", fontweight="bold", zorder=6)
 
-def ball(ax, x, y, r, color, edge="k", lw=1.5):
-    return ax.add_patch(Circle((x, y), r, fc=color, ec=edge, lw=lw, zorder=5))
+def arrow(ax, a, b, color="k", style="-", lw=1.4, rad=0.0, ms=12):
+    ax.add_patch(FancyArrowPatch(a, b, arrowstyle="-|>", mutation_scale=ms,
+                 color=color, linestyle=style, lw=lw, zorder=3,
+                 connectionstyle=f"arc3,rad={rad}"))
 
-def arrow(ax, a, b, color="k", style="-", lw=1.4, rad=0.0, z=3):
-    ax.add_patch(FancyArrowPatch(a, b, arrowstyle="-|>", mutation_scale=13,
-                 color=color, linestyle=style, lw=lw,
-                 connectionstyle=f"arc3,rad={rad}", zorder=z))
+def box(ax, x, y, w, h, text, fc="#ffffff", ec="k", fs=9, bold=False):
+    ax.add_patch(FancyBboxPatch((x - w / 2, y - h / 2), w, h,
+                 boxstyle="round,pad=0.03", fc=fc, ec=ec, lw=1.3, zorder=4))
+    ax.text(x, y, text, ha="center", va="center", fontsize=fs, zorder=5,
+            fontweight="bold" if bold else "normal")
 
-def box(ax, x, y, w, h, text, fc="#ffffff", ec="k", fs=8.5, z=4):
-    b = FancyBboxPatch((x - w / 2, y - h / 2), w, h, boxstyle="round,pad=0.02",
-                       fc=fc, ec=ec, lw=1.2, zorder=z)
-    ax.add_patch(b)
-    ax.text(x, y, text, ha="center", va="center", fontsize=fs, zorder=z + 1)
+def newpanel(ax, title):
+    ax.set_title(title, fontsize=11.5, pad=6)
+    ax.set_xlim(0, 10); ax.set_ylim(0, 7.8)
+    ax.set_aspect("equal"); ax.axis("off")
+    return ax
 
-# ============ (a) GRU ============
-ax = axs[0, 0]; ax.set_title("(a) GRU — baseline", fontsize=11)
-ball(ax, 0.10, 0.55, 0.055, C_IN); ax.text(0.10, 0.40, "$x_t$", ha="center", fontsize=10)
-box(ax, 0.46, 0.55, 0.50, 0.34, "GRU cell\n$h_t = GRU(h_{t-1}, x_t)$\nr, z gates", fs=8)
-ball(ax, 0.83, 0.55, 0.055, C_OUT); ax.text(0.83, 0.40, "$y_t$", ha="center", fontsize=10)
-arrow(ax, (0.155, 0.55), (0.21, 0.55))
-arrow(ax, (0.71, 0.55), (0.775, 0.55))
-# boucle récurrente h_{t-1} -> h_t
-arrow(ax, (0.46, 0.28), (0.46, 0.38), color=C_FB, rad=0.0, style="-", lw=1.2)
-ax.text(0.46, 0.24, "$h_{t-1}$ (loop)", ha="center", fontsize=7.5, color=C_FB)
-ax.text(0.30, 0.86, "one hidden stream,\ninput-dependent gates", fontsize=8, ha="center",
-        color="0.25", style="italic")
-ax.set_xlim(0, 1); ax.set_ylim(0, 1); ax.axis("off")
+fig, axs = plt.subplots(2, 2, figsize=(12.7, 11.0))
 
-# ============ (b) MFN 1L — dual-stream layer ============
-ax = axs[0, 1]; ax.set_title("(b) MFN layer — dual streams + fatigue", fontsize=11)
-ball(ax, 0.10, 0.50, 0.05, C_IN); ax.text(0.10, 0.36, "$x_t$", ha="center", fontsize=10)
-# fatigue boxes
-box(ax, 0.34, 0.815, 0.34, 0.13, "fatigue $\\varphi_{\\lambda}$", fc="#fdf1e5", fs=7.5)
-box(ax, 0.34, 0.185, 0.34, 0.13, "fatigue $\\varphi_{\\psi}$", fc="#e8eef7", fs=7.5)
-ball(ax, 0.34, 0.66, 0.075, C_LAM)          # lambda
-ball(ax, 0.34, 0.34, 0.075, C_PSI)          # psi
-ax.text(0.34, 0.78, "$h^{\\lambda}$ (fast)", ha="center", fontsize=8)
-ax.text(0.34, 0.215, "$h^{\\psi}$ (slow)", ha="center", fontsize=8)
-arrow(ax, (0.15, 0.50), (0.265, 0.62), color="k", lw=1.1)
-arrow(ax, (0.15, 0.50), (0.265, 0.38), color="k", lw=1.1)
-ax.text(0.205, 0.655, "$\\alpha_{\\lambda}$", fontsize=7.5, color="k")
-ax.text(0.205, 0.32, "$\\alpha_{\\psi}^{\\beta}$", fontsize=7.5, color="k")
-# couplages croisés
-arrow(ax, (0.415, 0.60), (0.415, 0.40), color="0.45", style="-.", lw=1.2, rad=-0.25)
-arrow(ax, (0.43, 0.40), (0.43, 0.60), color="0.45", style="-.", lw=1.2, rad=-0.25)
-ax.text(0.495, 0.51, "$g_{\\psi\\to\\lambda},\\; g_{\\lambda\\to\\psi}$",
-        fontsize=7.5, color="0.35")
-# readout
-ball(ax, 0.68, 0.50, 0.06, C_OUT)
-arrow(ax, (0.415, 0.66), (0.62, 0.53), lw=1.1)
-arrow(ax, (0.415, 0.34), (0.62, 0.47), lw=1.1)
-ax.text(0.68, 0.63, "$y_l = W_{ro}[\\tilde h_{\\lambda}; \\tilde h_{\\psi}]$",
-        fontsize=7.5, ha="center")
-arrow(ax, (0.74, 0.50), (0.80, 0.50), lw=1.1)
-ax.text(0.87, 0.60, "to next\nlayer", fontsize=7.5, ha="center", color="0.3")
-ax.set_xlim(0, 1); ax.set_ylim(0, 1); ax.axis("off")
+# ---------------- (a) GRU ----------------
+ax = newpanel(axs[0, 0], "(a) GRU — one stream, input-dependent gates")
+ball(ax, 1.4, 3.9, 0.5, C_IN, "$x_t$")
+box(ax, 5.0, 3.9, 4.3, 4.0,
+    r"GRU cell" "\n\n" r"$h_t = \mathrm{GRU}(h_{t-1}, x_t)$" "\n\n"
+    "r, z gates\none hidden stream", fs=9)
+ball(ax, 8.75, 3.9, 0.5, C_OUT, "$y_t$")
+ax.text(1.4, 2.85, "input", ha="center", fontsize=8, color="0.3")
+ax.text(8.75, 2.85, "output", ha="center", fontsize=8, color="0.3")
+arrow(ax, (1.9, 3.9), (2.85, 3.9))
+arrow(ax, (7.15, 3.9), (8.25, 3.9))
+arrow(ax, (4.1, 1.9), (5.9, 1.9), color=C_TD, style="--", lw=1.8, rad=-0.5)
+ax.text(5.0, 0.62, "$h_{t-1}$  (recurrence)", ha="center", fontsize=8.5,
+        color=C_TD)
 
-# ============ (c) MFN 3L ============
-ax = axs[1, 0]; ax.set_title("(c) MFN 3L — inter-layer feedback", fontsize=11)
-xs = 0.42
-ys = [0.20, 0.50, 0.80]
+# ---------------- (b) MFN 1L ----------------
+ax = newpanel(axs[0, 1], "(b) MFN layer — dual streams + fatigue")
+ball(ax, 1.3, 3.9, 0.5, C_IN, "$x_t$")
+ax.text(1.3, 2.9, "input", ha="center", fontsize=8, color="0.3")
+ball(ax, 4.2, 5.0, 0.62, C_LAM, "$\\lambda$")
+ball(ax, 4.2, 2.8, 0.62, C_PSI, "$\\psi$")
+ax.text(5.1, 5.0, "fast\nstream", fontsize=7.5, ha="left", va="center")
+ax.text(5.1, 2.8, "slow\nstream", fontsize=7.5, ha="left", va="center")
+box(ax, 4.2, 6.45, 3.4, 0.72, "fatigue $\\varphi_{\\lambda}$", fc="#fdf1e5", fs=8)
+box(ax, 4.2, 1.35, 3.4, 0.72, "fatigue $\\varphi_{\\psi}$", fc="#e8eef7", fs=8)
+arrow(ax, (4.2, 6.09), (4.2, 5.65), lw=1.1)
+arrow(ax, (4.2, 1.71), (4.2, 2.15), lw=1.1)
+arrow(ax, (1.8, 4.05), (3.6, 4.72))
+arrow(ax, (1.8, 3.75), (3.6, 3.08))
+ax.text(2.35, 4.98, "$\\alpha_{\\lambda}$", fontsize=8.5, ha="center")
+ax.text(2.35, 2.75, "$\\alpha_{\\psi}^{\\beta}$", fontsize=8.5, ha="center")
+arrow(ax, (4.95, 4.42), (4.95, 3.38), color=C_LAT, style="-.", lw=1.4, rad=-0.4, ms=10)
+arrow(ax, (5.30, 3.38), (5.30, 4.42), color=C_LAT, style="-.", lw=1.4, rad=-0.4, ms=10)
+ax.text(5.65, 2.05, "$g_{\\psi\\to\\lambda}, g_{\\lambda\\to\\psi}$",
+        fontsize=7.5, ha="center", color="0.3")
+ball(ax, 8.35, 3.9, 0.55, C_OUT, "$y_l$")
+ax.text(8.35, 2.9, "$y_l = W_{ro}[\\tilde h_{\\lambda}; \\tilde h_{\\psi}]$",
+        ha="center", fontsize=7.5)
+arrow(ax, (4.82, 4.9), (7.8, 4.15))
+arrow(ax, (4.82, 2.9), (7.8, 3.65))
+arrow(ax, (8.9, 3.9), (9.55, 3.9), lw=1.1)
+ax.text(9.45, 4.35, "next\nlayer", fontsize=7.5, ha="center", color="0.3")
+
+# ---------------- (c) MFN 3L ----------------
+ax = newpanel(axs[1, 0], "(c) MFN 3L — inter-layer feedback")
+ball(ax, 5.0, 1.1, 0.45, C_IN, "$x_t$")
+ys = [2.7, 4.5, 6.3]
 for i, y in enumerate(ys):
-    ball(ax, xs - 0.09, y + 0.06, 0.045, C_LAM)
-    ball(ax, xs + 0.09, y - 0.06, 0.045, C_PSI)
-    ax.text(xs, y + 0.22, f"layer {i+1}", ha="center", fontsize=8)
-# feed-forward y_l -> u_{l+1}
-for i in range(2):
-    arrow(ax, (xs + 0.09, ys[i] - 0.06 - 0.045), (xs, ys[i + 1] - 0.105 - 0.045 + 0.045),
-          lw=1.1)
-# top-down (t-1)
-for i in range(2):
-    arrow(ax, (xs - 0.09, ys[i + 1] - 0.105 - 0.045), (xs - 0.09, ys[i] + 0.105 + 0.045),
-          color=C_FB, style="--", lw=1.1)
-ax.text(0.10, 0.50, "top-down\n$(t-1)$", fontsize=7.5, color=C_FB,
-        ha="center", rotation=90)
-# skip layer 1 -> layer 3
-arrow(ax, (0.30, ys[0] + 0.06), (0.30, ys[2] - 0.06), color=C_FB, style=":", lw=1.6)
-ax.text(0.185, 0.50, "skip\n$(t)$", fontsize=7.5, color=C_FB, ha="center", rotation=90)
-ball(ax, xs, 0.94, 0.045, C_OUT); ax.text(xs, 0.99, "$y_t$", fontsize=9, ha="center")
-arrow(ax, (xs + 0.09, ys[2] + 0.105 + 0.045), (xs + 0.045, 0.94 - 0.045), lw=1.1)
-ball(ax, xs, 0.05, 0.045, C_IN); ax.text(xs, 0.005, "$x_t$", fontsize=9, ha="center")
-arrow(ax, (xs, 0.095), (xs - 0.045, ys[0] - 0.105), lw=1.1)
-ax.set_xlim(0, 1); ax.set_ylim(0, 1.02); ax.axis("off")
+    ball(ax, 4.5, y, 0.4, C_LAM)
+    ball(ax, 5.5, y, 0.4, C_PSI)
+    ax.text(4.5, y, "$\\lambda$", fontsize=7.5, color="white",
+            ha="center", va="center", fontweight="bold")
+    ax.text(5.5, y, "$\\psi$", fontsize=7.5, color="white",
+            ha="center", va="center", fontweight="bold")
+    ax.text(3.45, y, f"L{i+1}", fontsize=9, ha="center", va="center")
+arrow(ax, (5.0, 1.55), (5.0, 2.28))
+arrow(ax, (5.0, 3.12), (5.0, 4.08))
+arrow(ax, (5.0, 4.92), (5.0, 5.88))
+ball(ax, 5.0, 7.15, 0.45, C_OUT, "$y_t$")
+arrow(ax, (5.0, 6.72), (5.0, 6.68))
+# top-down (de plus profond -> plus superficiel), côté gauche
+arrow(ax, (2.5, 6.55), (2.5, 4.95), color=C_TD, style="--", lw=1.4)
+arrow(ax, (2.5, 4.55), (2.5, 2.95), color=C_TD, style="--", lw=1.4)
+ax.text(1.35, 5.55, "top-down", fontsize=8.5, color=C_TD, ha="center")
+ax.text(1.35, 5.05, "($t-1$)", fontsize=8, color=C_TD, ha="center")
+# skip L1 -> L3, côté droit
+arrow(ax, (7.5, 3.25), (7.5, 5.85), color="0.35", style=":", lw=1.8)
+ax.text(8.45, 4.5, "skip\n($t$)", fontsize=8.5, color="0.35", ha="left",
+        va="center")
 
-# ============ (d) MFN 3L3T ============
-ax = axs[1, 1]; ax.set_title("(d) MFN 3L3T — threaded grid (width of streams)",
-                             fontsize=11)
-tx = [0.22, 0.50, 0.78]
-ty = [0.20, 0.50, 0.80]
-for k, x in enumerate(tx):
-    ax.text(x, 0.965, ["thread A", "thread B", "thread C"][k],
-            ha="center", fontsize=8)
-    for y in ty:
-        ball(ax, x - 0.055, y + 0.045, 0.032, C_LAM)
-        ball(ax, x + 0.055, y - 0.045, 0.032, C_PSI)
-    for i in range(2):
-        arrow(ax, (x + 0.055, ty[i] - 0.075), (x, ty[i + 1] - 0.16 + 0.075),
-              lw=0.9)
+# ---------------- (d) MFN 3L3T ----------------
+ax = newpanel(axs[1, 1], "(d) MFN 3L3T — threaded grid (width of streams)")
+cols = [2.5, 5.5, 8.5]
+for k, x in enumerate(cols):
+    box(ax, x, 4.75, 2.5, 4.55, f"stack {chr(65+k)}", fc="#f7f7f7", fs=9)
+    for y in (3.6, 4.75, 5.9):
+        ball(ax, x, y, 0.36, "#8da0cb")
+arrow(ax, (cols[0], 4.0), (cols[0], 4.4), lw=1.0)
+arrow(ax, (cols[0], 5.15), (cols[0], 5.55), lw=1.0)
+arrow(ax, (cols[1], 4.0), (cols[1], 4.4), lw=1.0)
+arrow(ax, (cols[1], 5.15), (cols[1], 5.55), lw=1.0)
+arrow(ax, (cols[2], 4.0), (cols[2], 4.4), lw=1.0)
+arrow(ax, (cols[2], 5.15), (cols[2], 5.55), lw=1.0)
+# input partagé
+ball(ax, 5.5, 1.05, 0.42, C_IN, "$x_t$")
+ax.plot([2.5, 8.5], [1.75, 1.75], color="k", lw=1.2, zorder=2)
+arrow(ax, (5.5, 1.47), (5.5, 1.75), lw=1.0)
+arrow(ax, (2.5, 1.75), (2.5, 2.48), lw=1.0)
+arrow(ax, (8.5, 1.75), (8.5, 2.48), lw=1.0)
+ax.text(5.5, 0.45, "shared embedding", fontsize=7.5, ha="center", color="0.3")
 # latéral à chaque étage
-for y in ty:
-    for ka in range(2):
-        arrow(ax, (tx[ka] + 0.075, y), (tx[ka + 1] - 0.075, y),
-              color="0.4", style="-.", lw=1.2)
-ax.text(0.50, 0.90, "lateral feedback (same-$t$, per-neuron gates)",
-        fontsize=7.5, ha="center", color="0.35", style="italic")
-ball(ax, 0.50, 0.035, 0.045, C_OUT); ax.text(0.50, 0.002, "concat $\\to$ head",
-        fontsize=7.5, ha="center")
-for x in tx:
-    arrow(ax, (x + 0.055, ty[2] + 0.075), (0.50 - 0.045, 0.08), lw=0.9)
-ball(ax, 0.22, 0.045, 0.032, C_OUT); ball(ax, 0.78, 0.045, 0.032, C_OUT)
-ax.set_xlim(0, 1); ax.set_ylim(0, 1.02); ax.axis("off")
+for y in (3.6, 4.75, 5.9):
+    for a, b in ((3.72, 4.28), (6.72, 7.28)):
+        arrow(ax, (a, y), (b, y), color=C_LAT, style="-.", lw=1.3, ms=9)
+        arrow(ax, (b, y), (a, y), color=C_LAT, style="-.", lw=1.3, ms=9)
+ax.text(5.5, 6.98, "lateral feedback (same $t$)", fontsize=7.5, ha="center",
+        color="0.35")
+# sortie concaténée
+arrow(ax, (2.5, 6.55), (5.02, 7.02), lw=1.0)
+arrow(ax, (5.5, 6.55), (5.5, 7.02), lw=1.0)
+arrow(ax, (8.5, 6.55), (5.98, 7.02), lw=1.0)
+ball(ax, 5.5, 7.35, 0.45, C_OUT, "$y$")
+ax.text(6.45, 7.55, "concat $\\to$ head", fontsize=7.5, ha="left", va="center")
 
-fig.suptitle("Schematic comparison of the recurrent cores (one neuron ball = one "
-             "state stream; arrows = learned projections with the noted gating)",
-             fontsize=10.5, y=0.995)
-fig.tight_layout(rect=[0, 0, 1, 0.97])
-fig.savefig(os.path.join(BASE, "papers", "arch_diagram.pdf"), bbox_inches="tight")
-fig.savefig(os.path.join(BASE, "papers", "arch_diagram.png"), dpi=180, bbox_inches="tight")
+# ---------------- légende globale ----------------
+from matplotlib.lines import Line2D
+handles = [
+    Circle((0, 0), 0.5, fc=C_IN, ec="k"), Circle((0, 0), 0.5, fc=C_LAM, ec="k"),
+    Circle((0, 0), 0.5, fc=C_PSI, ec="k"), Circle((0, 0), 0.5, fc=C_OUT, ec="k"),
+    Line2D([0], [0], color="k", lw=1.4), Line2D([0], [0], color=C_TD, ls="--", lw=1.4),
+    Line2D([0], [0], color="0.35", ls=":", lw=1.8), Line2D([0], [0], color=C_LAT, ls="-.", lw=1.4),
+]
+labels = ["input $x_t$", "fast stream $\\lambda$", "slow stream $\\psi$",
+          "output $y_t$ / head", "data flow", "top-down $t-1$", "skip $t$",
+          "lateral (same $t$)", ]
+fig.legend(handles, labels, loc="lower center", ncol=4, fontsize=8.5,
+           frameon=False, bbox_to_anchor=(0.5, 0.005))
+fig.suptitle("Schematic comparison of the recurrent cores "
+             "(one ball = one state stream; arrows = learned projections)",
+             fontsize=10.5, y=0.985)
+fig.tight_layout(rect=[0, 0.05, 1, 0.97])
+for ext in ("pdf", "png"):
+    fig.savefig(os.path.join(BASE, "papers", f"arch_diagram.{ext}"),
+                bbox_inches="tight", dpi=180 if ext == "png" else None)
 print("saved papers/arch_diagram.{pdf,png}")
