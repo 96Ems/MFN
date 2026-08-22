@@ -431,17 +431,21 @@ decisive tool.
 The parameter exponent $\alpha_N$ will be estimated from the matched pair
 $P_0$ (MFN 1L, 1\,153\,440) and $P_4$ (MFN 3L$_{1e-3}$, 2\,612\,384), both
 at $10^{-3}$ for 4 epochs. With $L(N) = A N^{-\alpha_N}$, the bar
-$\alpha_N \ge 0.076$ (published transformer value) requires
-$L_{P_4} \le 2.4013 \times (2.612/1.153)^{-0.076} \approx 2.30$. This
-prediction was written to \texttt{phase5/scaling.md} before the run.
-\textbf{Interim epoch-1 observation (written after the fact, below the
-bar):} the learning-rate effect is confirmed---epoch-1 validation loss is
-$2.8317$ (ppl 16.97) at $10^{-3}$ versus $3.0541$ (ppl 21.20) for the same
-architecture at $5\times10^{-4}$, a $-0.22$ nat gain at identical epoch and
-data order. The remaining budget to the $\alpha_N$ bar is $-0.53$ nat over
-epochs 2--4 ($\approx -0.18$/epoch), steeper than the $5\times10^{-4}$
-trajectory's per-epoch gain ($-0.26$ at epoch 2); the prediction stands
-until the run ends.
+$\alpha_N \ge 0.076$ (Kaplan et al., non-embedding params) requires
+$L_{P_4} \le 2.4013 \times (2.612/1.153)^{-0.076} \approx 2.26$ on total
+parameters, and $\le 2.4013 \times (1.826/0.564)^{-0.076} \approx 2.20$ on
+non-embedding parameters ($V\!=\!4096$ embeddings removed; ratio $3.24\times$).
+Proof in \texttt{phase5/proofs/proof\_A3\_phi\_and\_bar.py} (and
+\texttt{proof\_A1\_sigmoid\_beta.py} for the $\beta\,x^{\beta-1}$ cliff). This prediction was written to
+\texttt{phase5/scaling.md} before the run; the $2.30$ printed in v0.2--v0.4 was
+arithmetic error ($0.044$ nat high, corresponds to $\alpha\approx0.053$).
+\textbf{Interim observations:} epoch-1 val $2.8317$ (ppl 16.97) at $10^{-3}$
+vs $3.0541$ (ppl 21.20) at $5\times10^{-4}$ ($-0.22$); epoch-2 val $2.6017$
+(ppl 13.49) vs $2.7945$ at $5\times10^{-4}$ ($-0.19$). Remaining budget to the
+total-param bar $2.26$ is $-0.58$ nat over epochs 3--4 ($\approx-0.29$/ep) and
+to the non-embedding bar $2.20$ is $-0.64$ nat; the $5\times10^{-4}$
+trajectory's ep1$\to$ep2 gain was $-0.26$. The bar stands until the run ends
+(expected $\sim$17:40).
 
 \section{Discussion and scaling programme}\label{sec:discussion}
 \paragraph{Axis D (data).} $\alpha_D \approx 0.085$ (measured, local).

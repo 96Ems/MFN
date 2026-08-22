@@ -59,16 +59,19 @@ class MyelinFatigueNet(nn.Module):
         gamma_lam = torch.sigmoid(self.w_gamma_lam)      # (H,)
         gamma_psi = torch.sigmoid(self.w_gamma_psi)      # (H,)
 
-        # Fatigue-modulated effective states (prior fatigue)
-        h_lam_eff = h_lam * (1.0 - phi_lam)              # (B, H)
-        h_psi_eff = h_psi * (1.0 - phi_psi)              # (B, H)
+        # Fatigue-modulated effective states (prior fatigue) — clamp 1-phi >=0
+        h_lam_eff = h_lam * (1.0 - phi_lam).clamp_min(0)  # (B, H)
+        h_psi_eff = h_psi * (1.0 - phi_psi).clamp_min(0)  # (B, H)
 
         # Input projection
         xp = self.input_proj(x)                          # (B, H)
 
         # Adaptive decay
+        # Proof A1 (/tmp/proof_A1_beta.py): sigmoid(z)**beta has d/dx = beta*x^{beta-1} -> inf as x->0+.
+        # In fp32 sigmoid(-103) flushes to 0.0; forward 0^0.2=0 finite but backward inf -> NaN.
+        # clamp_min(1e-6) bounds gradient to beta*1e-6^{beta-1} ~1.3e4, forward error ~0.02 (flat near 0).
         alpha_lam = self.decay_lam(x)                    # (B, H) in (0,1)
-        alpha_psi = self.decay_psi(x) ** self.beta       # (B, H) slower
+        alpha_psi = self.decay_psi(x).clamp_min(1e-6) ** self.beta  # (B, H) slower, NaN-safe
 
         # Bidirectional confidence gates (reversed argument order)
         joint_p2l = torch.cat([h_psi_eff, h_lam_eff], dim=-1)     # (B, 2H)
@@ -85,18 +88,19 @@ class MyelinFatigueNet(nn.Module):
             xp + fb_lam + self.W_psi2lam(h_psi_eff), h_lam)        # (B, H)
 
         # Tentative effective Lambda for Psi input (uses PRIOR phi_lam)
-        h_lam_eff_star = h_lam * (1.0 - phi_lam)                   # (B, H)
+        h_lam_eff_star = h_lam * (1.0 - phi_lam).clamp_min(0)       # (B, H)
 
         h_psi = self.gru_psi(
             xp + fb_psi + self.W_lam2psi(h_lam_eff_star), h_psi)   # (B, H)
 
-        # Fatigue update (post-GRU, affects next step only)
-        phi_lam = gamma_lam * phi_lam + (1.0 - gamma_lam) * h_lam.abs()
-        phi_psi = gamma_psi * phi_psi + (1.0 - gamma_psi) * h_psi.abs()
+        # Fatigue update (post-GRU, affects next step only) — clamp to [0,1] so 1-phi never flips sign
+        # Proof A3: phi=g*phi+(1-g)*|h| stays in [0,1] if |h|<=1 (GRU), but guard against future unbounded paths.
+        phi_lam = (gamma_lam * phi_lam + (1.0 - gamma_lam) * h_lam.abs()).clamp(0, 1)
+        phi_psi = (gamma_psi * phi_psi + (1.0 - gamma_psi) * h_psi.abs()).clamp(0, 1)
 
-        # Final effective states and readout
-        h_lam_out = h_lam * (1.0 - phi_lam)
-        h_psi_out = h_psi * (1.0 - phi_psi)
+        # Final effective states and readout — clamp 1-phi >=0 for safety
+        h_lam_out = h_lam * (1.0 - phi_lam).clamp_min(0)
+        h_psi_out = h_psi * (1.0 - phi_psi).clamp_min(0)
         y = self.readout(torch.cat([h_lam_out, h_psi_out], dim=-1))
 
         return h_lam, h_psi, phi_lam, phi_psi, y

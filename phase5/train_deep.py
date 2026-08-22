@@ -192,8 +192,19 @@ def main():
           f"topdown={kw['topdown']} params={n_params} epochs={args.epochs} "
           f"train_tokens={stats['train']['tokens']}", flush=True)
 
-    optimizer = torch.optim.AdamW([p for p in model.parameters() if p.requires_grad],
-                                  lr=args.lr, betas=(0.9, 0.999), weight_decay=0.1)
+    # B2 fix (proof /tmp/proof_A3_phi.py): w_gamma and gate u/v/b are logits/biases; weight decay pushes them to 0 -> gamma->0.5.
+    # Exclude norms/biases/gates and gamma from wd (standard AdamW practice).
+    decay, no_decay = [], []
+    for n, p in model.named_parameters():
+        if not p.requires_grad:
+            continue
+        if any(k in n for k in ["w_gamma", "td_", "sk_", ".u", ".v", ".b", "bias", "ln", "LayerNorm"]):
+            no_decay.append(p)
+        else:
+            decay.append(p)
+    optimizer = torch.optim.AdamW(
+        [{"params": decay, "weight_decay": 0.1}, {"params": no_decay, "weight_decay": 0.0}],
+        lr=args.lr, betas=(0.9, 0.999))
     best_val, history = float("inf"), history
     for ep in range(args.start_epoch, args.epochs + 1):
         t0 = time.time()

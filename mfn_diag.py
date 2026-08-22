@@ -64,15 +64,16 @@ class MyelinFatigueNetDiag(nn.Module):
         gamma_lam = torch.sigmoid(self.w_gamma_lam)
         gamma_psi = torch.sigmoid(self.w_gamma_psi)
 
-        h_lam_eff = h_lam * (1.0 - phi_lam)
-        h_psi_eff = h_psi * (1.0 - phi_psi)
+        h_lam_eff = h_lam * (1.0 - phi_lam).clamp_min(0)
+        h_psi_eff = h_psi * (1.0 - phi_psi).clamp_min(0)
 
         xp = self.input_proj(x)
 
+        # NaN-safe: see Proof A1 (mfn.py) — clamp bounds beta*x^{beta-1}
         alpha_lam = torch.sigmoid(self.decay_lam_scale * self.decay_lam_in(x)
                                    + self.decay_lam_bias)
         alpha_psi = torch.sigmoid(self.decay_psi_scale * self.decay_psi_in(x)
-                                   + self.decay_psi_bias) ** self.beta
+                                   + self.decay_psi_bias).clamp_min(1e-6) ** self.beta
 
         g_p2l = torch.sigmoid(self.gate_p2l_u * h_psi_eff
                                + self.gate_p2l_v * h_lam_eff + self.gate_p2l_b)
@@ -85,16 +86,16 @@ class MyelinFatigueNetDiag(nn.Module):
         mix_lam = xp + fb_lam + self.W_psi2lam_diag * h_psi_eff
         h_lam = alpha_lam * h_lam + (1.0 - alpha_lam) * torch.tanh(mix_lam)
 
-        h_lam_eff_star = h_lam * (1.0 - phi_lam)
+        h_lam_eff_star = h_lam * (1.0 - phi_lam).clamp_min(0)
 
         mix_psi = xp + fb_psi + self.W_lam2psi_diag * h_lam_eff_star
         h_psi = alpha_psi * h_psi + (1.0 - alpha_psi) * torch.tanh(mix_psi)
 
-        phi_lam = gamma_lam * phi_lam + (1.0 - gamma_lam) * h_lam.abs()
-        phi_psi = gamma_psi * phi_psi + (1.0 - gamma_psi) * h_psi.abs()
+        phi_lam = (gamma_lam * phi_lam + (1.0 - gamma_lam) * h_lam.abs()).clamp(0, 1)
+        phi_psi = (gamma_psi * phi_psi + (1.0 - gamma_psi) * h_psi.abs()).clamp(0, 1)
 
-        h_lam_out = h_lam * (1.0 - phi_lam)
-        h_psi_out = h_psi * (1.0 - phi_psi)
+        h_lam_out = h_lam * (1.0 - phi_lam).clamp_min(0)
+        h_psi_out = h_psi * (1.0 - phi_psi).clamp_min(0)
         y = self.readout(torch.cat([h_lam_out, h_psi_out], dim=-1))
 
         return h_lam, h_psi, phi_lam, phi_psi, y

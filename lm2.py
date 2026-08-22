@@ -106,12 +106,13 @@ class MFNDenseCore(nn.Module):
         else:
             gamma_lam = torch.sigmoid(self.w_gamma_lam)
             gamma_psi = torch.sigmoid(self.w_gamma_psi)
-            h_lam_eff = h_lam * (1.0 - phi_lam)
-            h_psi_eff = h_psi * (1.0 - phi_psi)
+            h_lam_eff = h_lam * (1.0 - phi_lam).clamp_min(0)
+            h_psi_eff = h_psi * (1.0 - phi_psi).clamp_min(0)
 
         xp = self.input_proj(x)
+        # NaN-safe clamp (Proof A1)
         alpha_lam = self.decay_lam(x)
-        alpha_psi = self.decay_psi(x) ** self.beta
+        alpha_psi = self.decay_psi(x).clamp_min(1e-6) ** self.beta
 
         if self.no_bidir:
             g_p2l = torch.ones_like(h_lam)
@@ -126,7 +127,7 @@ class MFNDenseCore(nn.Module):
         h_lam = self.gru_lam(
             xp + fb_lam + self.W_psi2lam(h_psi_eff), h_lam)
 
-        h_lam_eff_star = h_lam * (1.0 - phi_lam)
+        h_lam_eff_star = h_lam * (1.0 - phi_lam).clamp_min(0)
         if self.no_bidir:
             wp_to_lam = torch.zeros_like(h_lam)
         else:
@@ -134,11 +135,13 @@ class MFNDenseCore(nn.Module):
         h_psi = self.gru_psi(xp + fb_psi + wp_to_lam, h_psi)
 
         if not self.no_fatigue:
-            phi_lam = gamma_lam * phi_lam + (1.0 - gamma_lam) * h_lam.abs()
-            phi_psi = gamma_psi * phi_psi + (1.0 - gamma_psi) * h_psi.abs()
-
-        h_lam_out = h_lam * (1.0 - phi_lam)
-        h_psi_out = h_psi * (1.0 - phi_psi)
+            phi_lam = (gamma_lam * phi_lam + (1.0 - gamma_lam) * h_lam.abs()).clamp(0, 1)
+            phi_psi = (gamma_psi * phi_psi + (1.0 - gamma_psi) * h_psi.abs()).clamp(0, 1)
+            h_lam_out = h_lam * (1.0 - phi_lam).clamp_min(0)
+            h_psi_out = h_psi * (1.0 - phi_psi).clamp_min(0)
+        else:
+            h_lam_out = h_lam
+            h_psi_out = h_psi
         y = self.readout(torch.cat([h_lam_out, h_psi_out], dim=-1))
         return h_lam, h_psi, phi_lam, phi_psi, y
 

@@ -112,8 +112,8 @@ class MFNDeepLayer(nn.Module):
         h_lam, h_psi, phi_lam, phi_psi, _ = st
         gamma_lam = torch.sigmoid(self.w_gamma_lam)
         gamma_psi = torch.sigmoid(self.w_gamma_psi)
-        h_lam_eff = h_lam * (1.0 - phi_lam)
-        h_psi_eff = h_psi * (1.0 - phi_psi)
+        h_lam_eff = h_lam * (1.0 - phi_lam).clamp_min(0)
+        h_psi_eff = h_psi * (1.0 - phi_psi).clamp_min(0)
 
         xp = self.input_proj(u)
         alpha_lam = self.decay_lam(u)
@@ -143,7 +143,7 @@ class MFNDeepLayer(nn.Module):
         h_lam = self.gru_lam(mix_lam, h_lam)
 
         # psi uses the FRESH lambda state; feedback terms enter psi's mix too
-        h_lam_star = h_lam * (1.0 - phi_lam)
+        h_lam_star = h_lam * (1.0 - phi_lam).clamp_min(0)
         mix_psi = xp + fb_psi + self.W_lam2psi(h_lam_star)
         if y_td is not None:
             g = torch.sigmoid(self.td_psi_u * h_psi_eff
@@ -156,10 +156,10 @@ class MFNDeepLayer(nn.Module):
 
         h_psi = self.gru_psi(mix_psi, h_psi)
 
-        phi_lam = gamma_lam * phi_lam + (1.0 - gamma_lam) * h_lam.abs()
-        phi_psi = gamma_psi * phi_psi + (1.0 - gamma_psi) * h_psi.abs()
-        h_lam_out = h_lam * (1.0 - phi_lam)
-        h_psi_out = h_psi * (1.0 - phi_psi)
+        phi_lam = (gamma_lam * phi_lam + (1.0 - gamma_lam) * h_lam.abs()).clamp(0, 1)
+        phi_psi = (gamma_psi * phi_psi + (1.0 - gamma_psi) * h_psi.abs()).clamp(0, 1)
+        h_lam_out = h_lam * (1.0 - phi_lam).clamp_min(0)
+        h_psi_out = h_psi * (1.0 - phi_psi).clamp_min(0)
         y = self.readout(torch.cat([h_lam_out, h_psi_out], dim=-1))
         return (h_lam, h_psi, phi_lam, phi_psi, y)
 
@@ -262,13 +262,16 @@ class MFNDeepStack(nn.Module):
             if l == 0:
                 y0_fresh = [st_new_t[t][4] for t in range(self.n_threads)]
             if self.thread_fb and l < L - 1:
+                # Fix A2 (proof /tmp/proof_A2_lateral.py): gate must see fixed y_self, not accumulating acc.
+                # Previously acc threaded through gate -> order-dependent (Δ0.06). Now y_self fixed -> order-independent, matches Eq. lateral.
                 mixed = []
                 for t in range(self.n_threads):
-                    acc = st_new_t[t][4]
+                    y_self = st_new_t[t][4]
+                    acc = y_self
                     for s in range(self.n_threads):
                         if s != t:
                             acc = acc + self.lat[l][t][s](
-                                acc, st_new_t[s][4])
+                                y_self, st_new_t[s][4])
                     mixed.append(acc)
                 y_l = mixed
             else:
