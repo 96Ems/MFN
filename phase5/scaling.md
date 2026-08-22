@@ -11,7 +11,7 @@ externe ré-entraîné.
 |---|---|---|---|---|---|---|---|
 | P0 | mfn_dense H=144 (1 couche) | 1 153 440 | 4 @ 1e-3 | 2.4013 | 11.04 | 0.8813 | ✅ phase 4 |
 | P1 | deep_2l [192,96] | 2 122 368 | 4 @ 5e-4 | 2.6022 | 13.49 | 0.9472 | ⚠️ sous-entraîné (bug + lr moitié) — invalide pour la pente |
-| P2 | deep_3l [192,128,96] | 2 612 384 | 3 @ 5e-4 | ~2.60 attendu | — | — | 🔄 en cours — idem, invalide pour la pente |
+| P2 | deep_3l [192,128,96] | 2 612 384 | 3 @ 5e-4 | 2.6582 | 14.27 | 0.9675 | ✅ test ppl 14.53 — invalide pour la pente (budget ≠ P0), info : bat 2l à iso-epoch |
 | P3 | deep_2l [192,96] | 2 122 368 | 4 @ 1e-3 | — | — | — | ⏳ match ce soir |
 | P4 | deep_3l [192,128,96] | 2 612 384 | 4 @ 1e-3 | — | — | — | ⏳ match ce soir |
 
