@@ -248,6 +248,40 @@ concatenating readout.}
 \label{fig:arch}
 \end{figure}
 
+\section{Mechanisms of the feedback paths}\label{sec:mech}
+Figure~\ref{fig:mech} makes the two feedback mechanisms explicit.
+\paragraph{Inter-layer (Fig.~\ref{fig:mech}a).} The stack is unrolled over
+two time steps $t-1$ and $t$ for three layers $L1$ (shallow) to $L3$
+(deep). Data flows bottom-up within each time step (feed-forward
+$y_l \to u_{l+1}$, solid arrows). Two feedback channels recur:
+\emph{top--down}: the deeper layer's readout $y_{l+1}$ at $t-1$ is projected
+($\mathrm{td} = W_{td} y_{l+1}(t-1)$, dashed) and injected into layer $l$'s
+mixture at step $t$, gated per neuron by $\sigma(u \odot \tilde h + v \odot
+\mathrm{td} + b)$---a \emph{slow} channel (one step delayed), through which
+deep representations steer shallow processing; \emph{skip}: the fresh
+surface readout $y_0$ at $t$ (dotted) is injected into layers $l \ge 2$ in
+the same step---a \emph{fast} channel that lets the surface guide deep
+processing immediately. Both channels enter the $\lambda$ and $\psi$
+mixtures with their own gate parameters (Eqs.~\eqref{eq:td}--\eqref{eq:mixpsi}).
+\paragraph{Inter-thread (Fig.~\ref{fig:mech}b).} At each layer $l$, after
+all $K$ threads computed their readouts $y_l^{(k)}$, every thread receives
+gated lateral projections from the others (Eq.~\eqref{eq:lateral}) before
+feeding layer $l+1$ (and the head). The exchange happens at the same time
+step $t$, with a separate learned gate $(u^{(kj)}, v^{(kj)}, b^{(kj)})$ per
+ordered pair, so a thread may listen more to one neighbor than another; the
+per-neuron sigmoid gate makes the coupling selective rather than additive.
+
+\begin{figure}[t]\centering
+\includegraphics[width=0.94\textwidth]{feedback_mech.pdf}
+\caption{\small Mechanisms of the feedback paths: (a) inter-layer feedback
+as a time unrolled schematic ($t-1$ and $t$ columns; $L1$--$L3$ layers;
+dashed purple = top--down from $y_{l+1}(t-1)$, dotted = skip from
+$y_0(t)$, with the per-neuron gate formula); (b) inter-thread lateral
+feedback at one layer: three threads exchange gated projections of their
+readouts (Eq.~\eqref{eq:lateral}) before layer $l+1$.}
+\label{fig:mech}
+\end{figure}
+
 \section{Training methodology}\label{sec:training}
 \textbf{Objective.} Standard next-token cross-entropy over the corpus.
 \textbf{Optimizer.} AdamW ($\beta_1=0.9$, $\beta_2=0.999$,
@@ -298,7 +332,7 @@ GRU & $[215]$ & -- & 1\,159\,710 & trained, $10^{-3}$, 4 ep \\
 GPT-2 mini & $4\times120$ & -- & 1\,250\,640 & trained, $10^{-3}$, 6 ep \\
 MFN 2L & $[192,96]$ & 1 & 2\,122\,368 & trained $5\!\times\!10^{-4}$, 4 ep$^\dagger$ \\
 MFN 3L & $[192,128,96]$ & 1 & 2\,612\,384 & trained $5\!\times\!10^{-4}$, 3 ep \\
-MFN 3L$_{1e-3}$ & $[192,128,96]$ & 1 & 2\,612\,384 & \emph{in progress} \\
+MFN 3L$_{1e-3}$ & $[192,128,96]$ & 1 & 2\,612\,384 & $10^{-3}$, 4 ep --- ep1 val 2.8317 (running) \\
 MFN 3L3T & $[192,128,96]$ & 3 & 6\,753\,888 & scheduled \\
 \bottomrule
 \end{tabular}
@@ -400,6 +434,14 @@ at $10^{-3}$ for 4 epochs. With $L(N) = A N^{-\alpha_N}$, the bar
 $\alpha_N \ge 0.076$ (published transformer value) requires
 $L_{P_4} \le 2.4013 \times (2.612/1.153)^{-0.076} \approx 2.30$. This
 prediction was written to \texttt{phase5/scaling.md} before the run.
+\textbf{Interim epoch-1 observation (written after the fact, below the
+bar):} the learning-rate effect is confirmed---epoch-1 validation loss is
+$2.8317$ (ppl 16.97) at $10^{-3}$ versus $3.0541$ (ppl 21.20) for the same
+architecture at $5\times10^{-4}$, a $-0.22$ nat gain at identical epoch and
+data order. The remaining budget to the $\alpha_N$ bar is $-0.53$ nat over
+epochs 2--4 ($\approx -0.18$/epoch), steeper than the $5\times10^{-4}$
+trajectory's per-epoch gain ($-0.26$ at epoch 2); the prediction stands
+until the run ends.
 
 \section{Discussion and scaling programme}\label{sec:discussion}
 \paragraph{Axis D (data).} $\alpha_D \approx 0.085$ (measured, local).

@@ -1,0 +1,130 @@
+\relax 
+\providecommand\hyper@newdestlabel[2]{}
+\providecommand\HyperFirstAtBeginDocument{\AtBeginDocument}
+\HyperFirstAtBeginDocument{\ifx\hyper@anchor\@undefined
+\global\let\oldcontentsline\contentsline
+\gdef\contentsline#1#2#3#4{\oldcontentsline{#1}{#2}{#3}}
+\global\let\oldnewlabel\newlabel
+\gdef\newlabel#1#2{\newlabelxx{#1}#2}
+\gdef\newlabelxx#1#2#3#4#5#6{\oldnewlabel{#1}{{#2}{#3}}}
+\AtEndDocument{\ifx\hyper@anchor\@undefined
+\let\contentsline\oldcontentsline
+\let\newlabel\oldnewlabel
+\fi}
+\fi}
+\global\let\hyper@last\relax 
+\gdef\HyperFirstAtBeginDocument#1{#1}
+\providecommand\HyField@AuxAddToFields[1]{}
+\providecommand\HyField@AuxAddToCoFields[2]{}
+\citation{vaswani2017attention,radford2019language}
+\citation{hochreiter1997lstm,cho2014gru}
+\citation{gu2023mamba,peng2023rwkv}
+\citation{kaplan2020scaling,hoffmann2022chinchilla}
+\citation{horn1970behavior,stopfer1997impaired}
+\@writefile{toc}{\contentsline {section}{\numberline {1}Introduction}{1}{section.1}\protected@file@percent }
+\newlabel{sec:intro}{{1}{1}{Introduction}{section.1}{}}
+\citation{eldan2023tinystories}
+\citation{hochreiter1997lstm}
+\citation{cho2014gru}
+\citation{koutnik2014clockwork}
+\citation{mikolov2014learning}
+\citation{stopfer1997impaired}
+\citation{gu2023mamba}
+\citation{peng2023rwkv}
+\citation{kaplan2020scaling}
+\citation{hoffmann2022chinchilla}
+\citation{pearce2024reconciling,porian2024data}
+\citation{kaplan2020scaling}
+\citation{pearce2024reconciling}
+\citation{shazeer2017outrageously}
+\citation{ba2016highway}
+\@writefile{toc}{\contentsline {section}{\numberline {2}Background and related work}{2}{section.2}\protected@file@percent }
+\newlabel{sec:related}{{2}{2}{Background and related work}{section.2}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {3}The MFN architecture}{2}{section.3}\protected@file@percent }
+\newlabel{sec:method}{{3}{2}{The MFN architecture}{section.3}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.1}Notation}{2}{subsection.3.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.2}Dual-stream cell with fatigue}{2}{subsection.3.2}\protected@file@percent }
+\newlabel{sec:cell}{{3.2}{2}{Dual-stream cell with fatigue}{subsection.3.2}{}}
+\newlabel{eq:fatigue}{{1}{2}{Dual-stream cell with fatigue}{equation.3.1}{}}
+\newlabel{eq:decays}{{2}{3}{Dual-stream cell with fatigue}{equation.3.2}{}}
+\newlabel{eq:gates}{{3}{3}{Dual-stream cell with fatigue}{equation.3.3}{}}
+\newlabel{eq:fb}{{4}{3}{Dual-stream cell with fatigue}{equation.3.4}{}}
+\newlabel{eq:mixlam}{{5}{3}{Dual-stream cell with fatigue}{equation.3.5}{}}
+\newlabel{eq:mixpsi}{{6}{3}{Dual-stream cell with fatigue}{equation.3.6}{}}
+\newlabel{eq:readout}{{7}{3}{Dual-stream cell with fatigue}{equation.3.7}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.3}Inter-layer feedback}{3}{subsection.3.3}\protected@file@percent }
+\newlabel{sec:inter}{{3.3}{3}{Inter-layer feedback}{subsection.3.3}{}}
+\newlabel{eq:td}{{8}{3}{Inter-layer feedback}{equation.3.8}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.4}Multi-thread variant (width of streams)}{3}{subsection.3.4}\protected@file@percent }
+\newlabel{sec:threads}{{3.4}{3}{Multi-thread variant (width of streams)}{subsection.3.4}{}}
+\newlabel{eq:lateral}{{9}{3}{Multi-thread variant (width of streams)}{equation.3.9}{}}
+\newlabel{eq:head}{{10}{3}{Multi-thread variant (width of streams)}{equation.3.10}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.5}Numerical stability of the exponentiated decay}{4}{subsection.3.5}\protected@file@percent }
+\newlabel{sec:stability}{{3.5}{4}{Numerical stability of the exponentiated decay}{subsection.3.5}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {3.6}Visual comparison of the cores}{4}{subsection.3.6}\protected@file@percent }
+\newlabel{sec:visual}{{3.6}{4}{Visual comparison of the cores}{subsection.3.6}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {4}Mechanisms of the feedback paths}{4}{section.4}\protected@file@percent }
+\newlabel{sec:mech}{{4}{4}{Mechanisms of the feedback paths}{section.4}{}}
+\@writefile{toc}{\contentsline {paragraph}{Inter-layer (Fig.\nobreakspace  {}\ref  {fig:mech}a).}{4}{section*.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Inter-thread (Fig.\nobreakspace  {}\ref  {fig:mech}b).}{4}{section*.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {5}Training methodology}{4}{section.5}\protected@file@percent }
+\newlabel{sec:training}{{5}{4}{Training methodology}{section.5}{}}
+\citation{eldan2023tinystories}
+\@writefile{lof}{\contentsline {figure}{\numberline {1}{\ignorespaces \small  Schematic comparison of the four recurrent cores discussed in this paper: (a) GRU baseline; (b) MFN dual-stream layer (fast $\lambda $-stream in orange, slow $\psi $-stream in blue, fatigue accumulators, exponentiated decay $\alpha _\psi ^{\beta }$, cross-stream gates); (c) MFN 3L with top--down ($t-1$) and skip ($t$) feedback; (d) MFN 3L3T threaded grid with lateral feedback at every stage and concatenating readout.}}{5}{figure.1}\protected@file@percent }
+\newlabel{fig:arch}{{1}{5}{\small Schematic comparison of the four recurrent cores discussed in this paper: (a) GRU baseline; (b) MFN dual-stream layer (fast $\lambda $-stream in orange, slow $\psi $-stream in blue, fatigue accumulators, exponentiated decay $\alpha _\psi ^{\beta }$, cross-stream gates); (c) MFN 3L with top--down ($t-1$) and skip ($t$) feedback; (d) MFN 3L3T threaded grid with lateral feedback at every stage and concatenating readout}{figure.1}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {6}Experimental setup}{5}{section.6}\protected@file@percent }
+\newlabel{sec:setup}{{6}{5}{Experimental setup}{section.6}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {2}{\ignorespaces \small  Mechanisms of the feedback paths: (a) inter-layer feedback as a time unrolled schematic ($t-1$ and $t$ columns; $L1$--$L3$ layers; dashed purple = top--down from $y_{l+1}(t-1)$, dotted = skip from $y_0(t)$, with the per-neuron gate formula); (b) inter-thread lateral feedback at one layer: three threads exchange gated projections of their readouts (Eq.\nobreakspace  {}\textup  {\hbox {\mathsurround \z@ \normalfont  (\ignorespaces \ref  {eq:lateral}\unskip \@@italiccorr )}}) before layer $l+1$.}}{6}{figure.2}\protected@file@percent }
+\newlabel{fig:mech}{{2}{6}{\small Mechanisms of the feedback paths: (a) inter-layer feedback as a time unrolled schematic ($t-1$ and $t$ columns; $L1$--$L3$ layers; dashed purple = top--down from $y_{l+1}(t-1)$, dotted = skip from $y_0(t)$, with the per-neuron gate formula); (b) inter-thread lateral feedback at one layer: three threads exchange gated projections of their readouts (Eq.~\eqref {eq:lateral}) before layer $l+1$}{figure.2}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {1}{\ignorespaces Model family. $\dagger $: intermittent training history (bugged epochs) --- reported, not used in scaling fits.}}{6}{table.1}\protected@file@percent }
+\newlabel{tab:models}{{1}{6}{Model family. $\dagger $: intermittent training history (bugged epochs) --- reported, not used in scaling fits}{table.1}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {7}Results}{6}{section.7}\protected@file@percent }
+\newlabel{sec:results}{{7}{6}{Results}{section.7}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {7.1}Equal-size comparison (phase 4 protocol, $10^{-3}$, matched)}{6}{subsection.7.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {7.2}Depth family at equal stage}{6}{subsection.7.2}\protected@file@percent }
+\newlabel{sec:depth}{{7.2}{6}{Depth family at equal stage}{subsection.7.2}{}}
+\citation{kaplan2020scaling}
+\citation{hoffmann2022chinchilla}
+\@writefile{lot}{\contentsline {table}{\numberline {2}{\ignorespaces Phase-4 baselines: validation loss per epoch and test perplexity. All at $10^{-3}$, identical data order, seed 0.}}{7}{table.2}\protected@file@percent }
+\newlabel{tab:baselines}{{2}{7}{Phase-4 baselines: validation loss per epoch and test perplexity. All at $10^{-3}$, identical data order, seed 0}{table.2}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {3}{\ignorespaces Validation loss by epoch, phase-5 family ($5\times 10^{-4}$). The 3L run uses 3 epochs; a 4th epoch was added later and is pending.}}{7}{table.3}\protected@file@percent }
+\newlabel{tab:depth}{{3}{7}{Validation loss by epoch, phase-5 family ($5\times 10^{-4}$). The 3L run uses 3 epochs; a 4th epoch was added later and is pending}{table.3}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {7.3}Data exponent $\alpha _D$}{7}{subsection.7.3}\protected@file@percent }
+\newlabel{sec:ad}{{7.3}{7}{Data exponent $\alpha _D$}{subsection.7.3}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {7.4}Robustness case study}{7}{subsection.7.4}\protected@file@percent }
+\newlabel{sec:robust}{{7.4}{7}{Robustness case study}{subsection.7.4}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {7.5}Preregistered falsifiable prediction}{7}{subsection.7.5}\protected@file@percent }
+\citation{pearce2024reconciling,porian2024data}
+\citation{kaplan2020scaling}
+\@writefile{lof}{\contentsline {figure}{\numberline {3}{\ignorespaces \small  Scaling evidence: (A) validation loss vs.\ parameters with the reference slopes $\alpha \in \{0.057,0.076,0.095\}$ anchored at MFN 1L; (B) validation loss vs.\ tokens seen with fitted local exponents $\alpha _D$ (MFN $\approx 0.085$, GRU $\approx 0.064$, GPT-2-mini $\approx 0.051$). The shaded wedge marks the falsifiable band for the running 3L$_{1e-3}$ run (\texttt  {phase5/scaling\_curve.png}).}}{8}{figure.3}\protected@file@percent }
+\newlabel{fig:scaling}{{3}{8}{\small Scaling evidence: (A) validation loss vs.\ parameters with the reference slopes $\alpha \in \{0.057,0.076,0.095\}$ anchored at MFN 1L; (B) validation loss vs.\ tokens seen with fitted local exponents $\alpha _D$ (MFN $\approx 0.085$, GRU $\approx 0.064$, GPT-2-mini $\approx 0.051$). The shaded wedge marks the falsifiable band for the running 3L$_{1e-3}$ run (\texttt {phase5/scaling\_curve.png})}{figure.3}{}}
+\@writefile{lot}{\contentsline {table}{\numberline {4}{\ignorespaces Local data exponents (fit over 4 epochs).}}{8}{table.4}\protected@file@percent }
+\newlabel{tab:alphad}{{4}{8}{Local data exponents (fit over 4 epochs)}{table.4}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {8}Discussion and scaling programme}{8}{section.8}\protected@file@percent }
+\newlabel{sec:discussion}{{8}{8}{Discussion and scaling programme}{section.8}{}}
+\@writefile{toc}{\contentsline {paragraph}{Axis D (data).}{8}{section*.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Axis N (parameters).}{8}{section*.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Axis depth vs. width of streams.}{8}{section*.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {paragraph}{Axis context.}{8}{section*.6}\protected@file@percent }
+\bibstyle{abbrv}
+\bibcite{ba2016highway}{{1}{2016}{{Ba et al.}}{{}}}
+\bibcite{cho2014gru}{{2}{2014}{{Cho et al.}}{{}}}
+\bibcite{eldan2023tinystories}{{3}{2023}{{Eldan and Li}}{{}}}
+\bibcite{gu2023mamba}{{4}{2023}{{Gu and Dao}}{{}}}
+\bibcite{hochreiter1997lstm}{{5}{1997}{{Hochreiter and Schmidhuber}}{{}}}
+\bibcite{hoffmann2022chinchilla}{{6}{2022}{{Hoffmann et al.}}{{}}}
+\bibcite{horn1970behavior}{{7}{1970}{{Horn}}{{}}}
+\bibcite{kaplan2020scaling}{{8}{2020}{{Kaplan et al.}}{{}}}
+\bibcite{koutnik2014clockwork}{{9}{2014}{{Koutn\'ik et al.}}{{}}}
+\bibcite{mikolov2014learning}{{10}{2015}{{Mikolov et al.}}{{}}}
+\bibcite{pearce2024reconciling}{{11}{2024}{{Pearce and Song}}{{}}}
+\bibcite{peng2023rwkv}{{12}{2023}{{Peng et al.}}{{}}}
+\bibcite{porian2024data}{{13}{2024}{{Porian et al.}}{{}}}
+\bibcite{radford2019language}{{14}{2019}{{Radford et al.}}{{}}}
+\bibcite{shazeer2017outrageously}{{15}{2017}{{Shazeer et al.}}{{}}}
+\bibcite{stopfer1997impaired}{{16}{1997}{{Stopfer}}{{}}}
+\@writefile{toc}{\contentsline {paragraph}{Caveats.}{9}{section*.7}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {9}Conclusion}{9}{section.9}\protected@file@percent }
+\newlabel{sec:conclusion}{{9}{9}{Conclusion}{section.9}{}}
+\bibcite{vaswani2017attention}{{17}{2017}{{Vaswani et al.}}{{}}}
+\gdef \@abspage@last{10}
