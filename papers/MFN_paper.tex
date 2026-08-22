@@ -227,6 +227,27 @@ $\beta$ small), and the gradient is now bounded by
 $\beta\,\varepsilon^{\beta-1} \approx 1.3\times10^{4}$---large but finite,
 and $0$ exactly inside the clamped region.
 
+\subsection{Visual comparison of the cores}\label{sec:visual}
+Figure~\ref{fig:arch} contrasts the recurrent cores schematically: a single
+hidden stream with input-dependent gates (GRU), the dual-stream cell with
+fatigue and cross-stream confidence gating (MFN 1L), the inter-layer
+top--down and skip couplings (MFN 3L), and the threaded grid with lateral
+feedback at every stage (MFN 3L3T). One ball denotes one state stream
+(per-neuron detail is suppressed for readability); arrows denote learned
+projections carrying the gating shown in \S\ref{sec:cell}--\ref{sec:threads}.
+
+\begin{figure}[t]\centering
+\includegraphics[width=0.88\textwidth]{arch_diagram.pdf}
+\caption{\small Schematic comparison of the four recurrent cores discussed
+in this paper: (a) GRU baseline; (b) MFN dual-stream layer (fast
+$\lambda$-stream in orange, slow $\psi$-stream in blue, fatigue
+accumulators, exponentiated decay $\alpha_\psi^{\beta}$, cross-stream
+gates); (c) MFN 3L with top--down ($t-1$) and skip ($t$) feedback;
+(d) MFN 3L3T threaded grid with lateral feedback at every stage and
+concatenating readout.}
+\label{fig:arch}
+\end{figure}
+
 \section{Training methodology}\label{sec:training}
 \textbf{Objective.} Standard next-token cross-entropy over the corpus.
 \textbf{Optimizer.} AdamW ($\beta_1=0.9$, $\beta_2=0.999$,
