@@ -33,6 +33,8 @@ class MFNDeepConfig(PretrainedConfig):
         beta: float = 0.2,
         topdown: bool = True,
         skip_fb: bool = False,
+        n_threads: int = 1,
+        thread_fb: bool = True,
         dropout: float = 0.0,
         initializer_range: float = 0.02,
         **kwargs,
@@ -42,6 +44,8 @@ class MFNDeepConfig(PretrainedConfig):
         self.beta = beta
         self.topdown = topdown
         self.skip_fb = skip_fb
+        self.n_threads = n_threads
+        self.thread_fb = thread_fb
         self.dropout = dropout
         self.initializer_range = initializer_range
         self.tie_word_embeddings = True
@@ -160,26 +164,73 @@ class MFNDeepLayer(nn.Module):
         return (h_lam, h_psi, phi_lam, phi_psi, y)
 
 
+class LateralFB(nn.Module):
+    """Feedback latéral entre threads (même recette que le topdown intra-thread :
+    projection + gate per-neuron sigmoïde sur (état_self, état_other))."""
+
+    def __init__(self, H):
+        super().__init__()
+        self.W = nn.Linear(H, H)
+        self.u = nn.Parameter(torch.zeros(H))
+        self.v = nn.Parameter(torch.zeros(H))
+        self.b = nn.Parameter(torch.zeros(H))
+
+    def forward(self, h_me, h_other):
+        g = torch.sigmoid(self.u * h_me + self.v * h_other + self.b)
+        return g * self.W(h_other)
+
+
 class MFNDeepStack(nn.Module):
     def __init__(self, config):
         super().__init__()
         w = config.layer_widths
         self.widths = w
-        self.layers = nn.ModuleList()
-        for l, H in enumerate(w):
-            h_in = w[l - 1] if l > 0 else H
-            h_td = w[l + 1] if (config.topdown and l < len(w) - 1) else None
-            h_sk = w[0] if (config.skip_fb and l >= 2) else None
-            self.layers.append(MFNDeepLayer(h_in, H, h_td, h_sk, config.beta))
-        self.final_proj = nn.Linear(2 * w[-1], w[0])
+        self.n_threads = getattr(config, "n_threads", 1)
+        self.thread_fb = getattr(config, "thread_fb", True)
+        if self.n_threads == 1:
+            # structure EXACTE d'origine (stack.layers) pour que les
+            # checkpoints 2l/3l existants se chargent à l'identique
+            self.layers = nn.ModuleList()
+            for l, H in enumerate(w):
+                h_in = w[l - 1] if l > 0 else H
+                h_td = w[l + 1] if (config.topdown and l < len(w) - 1) else None
+                h_sk = w[0] if (config.skip_fb and l >= 2) else None
+                self.layers.append(
+                    MFNDeepLayer(h_in, H, h_td, h_sk, config.beta))
+        else:
+            # grille : stacks[t][l] = couche l du thread t (autonome,
+            # topdown+skip intra-thread) + couplage latéral entre threads.
+            self.stacks = nn.ModuleList()
+            for _ in range(self.n_threads):
+                layers = nn.ModuleList()
+                for l, H in enumerate(w):
+                    h_in = w[l - 1] if l > 0 else H
+                    h_td = w[l + 1] if (config.topdown and l < len(w) - 1) else None
+                    h_sk = w[0] if (config.skip_fb and l >= 2) else None
+                    layers.append(
+                        MFNDeepLayer(h_in, H, h_td, h_sk, config.beta))
+                self.stacks.append(layers)
+        # lat[l][dst][src] : feedback du thread src vers dst à la sortie de la
+        # couche l (largeur w[l]).
+        self.lat = nn.ModuleList()
+        if self.thread_fb and self.n_threads > 1:
+            for l in range(len(w) - 1):
+                pairs = nn.ModuleList()
+                for _ in range(self.n_threads):
+                    pairs.append(nn.ModuleList(
+                        [LateralFB(w[l]) for _ in range(self.n_threads)]))
+                self.lat.append(pairs)
+        self.final_proj = nn.Linear(2 * w[-1] * self.n_threads, w[0])
 
     def init_state(self, batch, device="cpu"):
-        return [lay.init_state(batch, lay.H, device) for lay in self.layers]
+        if self.n_threads == 1:
+            return [lay.init_state(batch, lay.H, device)
+                    for lay in self.layers]
+        return [[lay.init_state(batch, lay.H, device) for lay in st]
+                for st in self.stacks]
 
-    def step(self, emb, states):
-        """One timestep: sequential shallow -> deep pass with feedback.
-        top-down uses the deeper layer's y at t-1 (slow); skip uses layer-0's
-        y of the current step (fast surface guides deep within the step)."""
+    def _step_1(self, emb, states):
+        """Step original (n_threads=1), bit-identique à l'avant-grillage."""
         new_states, y_l = [], None
         y0_fresh = None
         for l, (lay, st) in enumerate(zip(self.layers, states)):
@@ -192,6 +243,57 @@ class MFNDeepStack(nn.Module):
             if l == 0:
                 y0_fresh = st_new[4]
         return new_states, y_l
+
+    def _step_N(self, emb, states):
+        """Step grillage (n_threads>1) : tous les threads calculent la couche
+        l, puis feedback latéral mélange leurs y frais (u de la couche l+1)."""
+        L = len(self.widths)
+        new_threads = []
+        y_l = [None] * self.n_threads
+        y0_fresh = [None] * self.n_threads
+        for l in range(L):
+            st_new_t = []
+            for t in range(self.n_threads):
+                lay = self.stacks[t][l]
+                u = emb if l == 0 else y_l[t]
+                y_td = states[t][l + 1][4] if hasattr(lay, "W_td") else None
+                y_sk = y0_fresh[t] if hasattr(lay, "W_sk") else None
+                st_new_t.append(lay(u, states[t][l], y_td, y_sk))
+            if l == 0:
+                y0_fresh = [st_new_t[t][4] for t in range(self.n_threads)]
+            if self.thread_fb and l < L - 1:
+                mixed = []
+                for t in range(self.n_threads):
+                    acc = st_new_t[t][4]
+                    for s in range(self.n_threads):
+                        if s != t:
+                            acc = acc + self.lat[l][t][s](
+                                acc, st_new_t[s][4])
+                    mixed.append(acc)
+                y_l = mixed
+            else:
+                y_l = [st_new_t[t][4] for t in range(self.n_threads)]
+            new_threads.append(st_new_t)
+        return [[new_threads[l][t] for l in range(L)]
+                for t in range(self.n_threads)], y_l
+
+    def step(self, emb, states):
+        if self.n_threads == 1:
+            return self._step_1(emb, states)
+        return self._step_N(emb, states)
+
+    def combine(self, states):
+        """Concatène les sorties (2*hidden final) des threads -> final_proj."""
+        if self.n_threads == 1:
+            last = states[-1]
+            return torch.cat([last[0] * (1 - last[2]),
+                              last[1] * (1 - last[3])], dim=-1)
+        hcats = []
+        for t in range(self.n_threads):
+            last = states[t][-1]
+            hcats.append(last[0] * (1 - last[2]))
+            hcats.append(last[1] * (1 - last[3]))
+        return torch.cat(hcats, dim=-1)
 
 
 class MFNDeepForCausalLM(RecurrentStateCacheMixin, PreTrainedModel, GenerationMixin):
@@ -229,9 +331,7 @@ class MFNDeepForCausalLM(RecurrentStateCacheMixin, PreTrainedModel, GenerationMi
             if emb.shape[1] > 1:
                 emb = emb[:, -1:]
             states, _ = self.stack.step(emb[:, 0], state)
-            hout = self.stack.final_proj(
-                torch.cat([states[-1][0] * (1 - states[-1][2]),
-                           states[-1][1] * (1 - states[-1][3])], dim=-1))
+            hout = self.stack.final_proj(self.stack.combine(states))
             logits = self.lm_head(self.ln(hout))[:, None]
             return CausalLMOutput(logits=logits, hidden_states=tuple(states))
 
@@ -239,10 +339,7 @@ class MFNDeepForCausalLM(RecurrentStateCacheMixin, PreTrainedModel, GenerationMi
         logits = []
         for t in range(emb.shape[1]):
             states, _ = self.stack.step(emb[:, t], states)
-            last = states[-1]
-            hout = self.stack.final_proj(
-                torch.cat([last[0] * (1 - last[2]), last[1] * (1 - last[3])],
-                          dim=-1))
+            hout = self.stack.final_proj(self.stack.combine(states))
             logits.append(self.lm_head(self.ln(hout)))
         logits = torch.stack(logits, dim=1)
 
@@ -257,9 +354,10 @@ class MFNDeepForCausalLM(RecurrentStateCacheMixin, PreTrainedModel, GenerationMi
 
 
 def build_deep(model_id: str, vocab_size: int, widths, beta=0.2,
-               topdown=True, skip_fb=False):
+               topdown=True, skip_fb=False, n_threads=1, thread_fb=True):
     cfg = MFNDeepConfig(vocab_size=vocab_size, layer_widths=widths, beta=beta,
-                        topdown=topdown, skip_fb=skip_fb)
+                        topdown=topdown, skip_fb=skip_fb,
+                        n_threads=n_threads, thread_fb=thread_fb)
     return MFNDeepForCausalLM(cfg)
 
 

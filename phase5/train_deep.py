@@ -24,6 +24,8 @@ ARCHES = {
     "5l": dict(widths=[192, 128, 128, 128, 96], topdown=True, skip_fb=True),
     "10l": dict(widths=[192, 128, 128, 128, 128, 128, 128, 128, 128, 96],
                 topdown=True, skip_fb=True),
+    "3l3t": dict(widths=[192, 128, 96], topdown=True, skip_fb=True,
+                 n_threads=3, thread_fb=True),
 }
 
 
