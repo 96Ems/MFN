@@ -9,12 +9,11 @@ externe ré-entraîné.
 
 | Point | Config | Params | Epochs | Val loss | Ppl | BPC | Statut |
 |---|---|---|---|---|---|---|---|
-| P0 | mfn_dense 1 couche H=144 | 1 153 440 | 4 | 2.4013 | 11.04 | 0.8813 | ✅ phase 4 |
-| P1 | deep_2l [192,96] | 2 122 368 | — | — | — | — | 🔄 |
-| P2 | deep_3l [192,128,96] | ~2.4M | — | — | — | — | ⏳ |
-| P3 | mfn_dense 1 couche H=80 | ~0.5M | — | — | — | — | ⏳ |
-| P4 | deep_4l / 2 couches larges | ~4-5M | — | — | — | — | ⏳ |
-| P5 (opt) | — | ~8M | — | — | — | — | ⏳ |
+| P0 | mfn_dense H=144 (1 couche) | 1 153 440 | 4 @ 1e-3 | 2.4013 | 11.04 | 0.8813 | ✅ phase 4 |
+| P1 | deep_2l [192,96] | 2 122 368 | 4 @ 5e-4 | 2.6022 | 13.49 | 0.9472 | ⚠️ sous-entraîné (bug + lr moitié) — invalide pour la pente |
+| P2 | deep_3l [192,128,96] | 2 612 384 | 3 @ 5e-4 | ~2.60 attendu | — | — | 🔄 en cours — idem, invalide pour la pente |
+| P3 | deep_2l [192,96] | 2 122 368 | 4 @ 1e-3 | — | — | — | ⏳ match ce soir |
+| P4 | deep_3l [192,128,96] | 2 612 384 | 4 @ 1e-3 | — | — | — | ⏳ match ce soir |
 
 ## Ancres locales (mêmes données, déjà entraînées — gratuites)
 
