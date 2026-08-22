@@ -156,7 +156,13 @@ def main():
     BACKFILL = {"2l": [{"epoch": 1, "train_loss": 3.6595, "val_loss": 3.0371,
                         "ppl": 20.84, "bpc": 1.1055, "tok_s": 5993.0},
                        {"epoch": 2, "train_loss": 2.9341, "val_loss": 2.8161,
-                        "ppl": 16.71, "bpc": 1.0250, "tok_s": 5318.0}]}
+                        "ppl": 16.71, "bpc": 1.0250, "tok_s": 5318.0}],
+                "3l": [{"epoch": 1, "train_loss": 3.6944, "val_loss": 3.0541,
+                        "ppl": 21.20, "bpc": 1.1117, "tok_s": 4290.0},
+                       {"epoch": 2, "train_loss": 2.9220, "val_loss": 2.7945,
+                        "ppl": 16.35, "bpc": 1.0172, "tok_s": 4279.0},
+                       {"epoch": 3, "train_loss": 2.7316, "val_loss": 2.6582,
+                        "ppl": 14.27, "bpc": 0.9675, "tok_s": 4125.0}]}
     if args.start_epoch > 1 and os.path.isdir(ckpt_dir):
         model = MFNDeepForCausalLM.from_pretrained(ckpt_dir).to(device)
         history = [e for e in BACKFILL.get(args.arch, [])

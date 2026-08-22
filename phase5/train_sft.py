@@ -80,10 +80,10 @@ def main():
 
     train_ids, train_mask, val_ids, val_mask, stats = load_data()
     from transformers import AutoModelForCausalLM, AutoTokenizer
-    tokenizer = AutoTokenizer.from_pretrained(os.path.join(P4, "tokenizer_subset"))
+    tokenizer = AutoTokenizer.from_pretrained(os.path.join(ROOT, "phase4", "tokenizer_subset"))
     base_dir = BASES[args.base]
     print(f"loading base {args.base} from {base_dir}", flush=True)
-    model = AutoModelForCausalLM.from_pretrained(base_dir).to(device)
+    model = AutoModelForCausalLM.from_pretrained(base_dir, trust_remote_code=True).to(device)
     n_params = true_param_count(model)
     tag = f"sft_{args.base}"
     print(f"[{tag}] params={n_params} epochs={args.epochs} "
