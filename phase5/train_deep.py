@@ -21,6 +21,9 @@ ARCHES = {
     "2l": dict(widths=[192, 96], topdown=True, skip_fb=False),
     "3l": dict(widths=[192, 128, 96], topdown=True, skip_fb=True),
     "1l_192": dict(widths=[192], topdown=False, skip_fb=False),
+    "5l": dict(widths=[192, 128, 128, 128, 96], topdown=True, skip_fb=True),
+    "10l": dict(widths=[192, 128, 128, 128, 128, 128, 128, 128, 128, 96],
+                topdown=True, skip_fb=True),
 }
 
 
