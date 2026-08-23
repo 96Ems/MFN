@@ -26,12 +26,18 @@ ARCHES = {
                 topdown=True, skip_fb=True),
     "3l3t": dict(widths=[192, 128, 96], topdown=True, skip_fb=True,
                  n_threads=3, thread_fb=True),
+    # --- MFN-2Z : deux zones asymétriques (corticale large / sous-corticale
+    # étroite + lente). Taille du modèle = nb de zones x leurs étages. ---
+    "2z": dict(widths=[160, 112, 80], topdown=True, skip_fb=True,
+               n_threads=2, thread_fb=True,
+               zone_widths=[[160, 112, 80], [96, 64, 48]],
+               zone_betas=[0.2, 0.6]),
 }
 
 
-def load_data():
-    stats = json.load(open(os.path.join(DATA, "stats.json")))
-    t = lambda n: torch.from_numpy(np.load(os.path.join(DATA, f"{n}.npy")).copy()).long()
+def load_data(data_dir=DATA):
+    stats = json.load(open(os.path.join(data_dir, "stats.json")))
+    t = lambda n: torch.from_numpy(np.load(os.path.join(data_dir, f"{n}.npy")).copy()).long()
     return t("train"), t("validation"), t("test"), stats
 
 
@@ -140,6 +146,10 @@ def main():
                     help="torch.compile mode reduce-overhead (CUDA graphs) — "
                          "fallback eager si indisponible sur cette carte")
     ap.add_argument("--eval-batch", type=int, default=16)
+    ap.add_argument("--data", default=DATA,
+                    help="dir contenant train/validation/test.npy + stats.json "
+                         "(défaut: phase4/data_subset ; ex big: phase4/data_big)")
+    ap.add_argument("--tok", default=TOK, help="tokenizer dir")
     args = ap.parse_args()
 
     torch.set_num_threads(args.threads)
@@ -148,12 +158,13 @@ def main():
     device = "cuda" if args.cuda and torch.cuda.is_available() else "cpu"
     print(f"device: {device}", flush=True)
 
-    train_ids, val_ids, test_ids, stats = load_data()
+    train_ids, val_ids, test_ids, stats = load_data(args.data)
     from transformers import AutoTokenizer
-    tokenizer = AutoTokenizer.from_pretrained(TOK)
+    tokenizer = AutoTokenizer.from_pretrained(args.tok)
     vocab = tokenizer.vocab_size
 
-    kw = ARCHES[args.arch]
+    kw = dict(ARCHES[args.arch])
+    zw, zb = kw.pop("zone_widths", None), kw.pop("zone_betas", None)
     tag = args.tag or f"deep_{args.arch}"
     ckpt_dir = os.path.join(CKPT, tag)
     # Historique des epochs 1-2 du run deep_2l interrompu (logs p5_2l.log) —
@@ -178,7 +189,7 @@ def main():
         if args.start_epoch > 1:
             print(f"[{tag}] --start-epoch {args.start_epoch} mais pas de "
                   f"checkpoint -> init fraîche", flush=True)
-        model = build_deep(tag, vocab, **kw).to(device)
+        model = build_deep(tag, vocab, zone_widths=zw, zone_betas=zb, **kw).to(device)
         history = []
     if args.compile:
         try:

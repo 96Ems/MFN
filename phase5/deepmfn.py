@@ -37,11 +37,18 @@ class MFNDeepConfig(PretrainedConfig):
         thread_fb: bool = True,
         dropout: float = 0.0,
         initializer_range: float = 0.02,
+        zone_widths=None,
+        zone_betas=None,
         **kwargs,
     ):
         self.vocab_size = vocab_size
         self.layer_widths = list(layer_widths) if layer_widths else [192, 96]
         self.beta = beta
+        # --- zones asymétriques (MFN-2Z) : thread t = zone t ---
+        # zone_widths[t] = largeurs de la zone t (même nb d'étages L requis);
+        # zone_betas[t] = beta du psi-stream de la zone t (vitesse de conduction).
+        self.zone_widths = [list(z) for z in zone_widths] if zone_widths else None
+        self.zone_betas = list(zone_betas) if zone_betas else None
         self.topdown = topdown
         self.skip_fb = skip_fb
         self.n_threads = n_threads
@@ -180,9 +187,64 @@ class LateralFB(nn.Module):
         return g * self.W(h_other)
 
 
+class LateralFBX(nn.Module):
+    """Feedback latéral entre ZONES de largeurs différentes (MFN-2Z).
+    Projection d'abord (h_src -> h_dst), puis gate per-neuron sur
+    (y_me fixe, projection) — ordre-indépendant (fix A2)."""
+
+    def __init__(self, h_src, h_dst):
+        super().__init__()
+        self.W = nn.Linear(h_src, h_dst)
+        self.u = nn.Parameter(torch.zeros(h_dst))
+        self.v = nn.Parameter(torch.zeros(h_dst))
+        self.b = nn.Parameter(torch.zeros(h_dst))
+
+    def forward(self, y_me, y_other):
+        p = self.W(y_other)
+        g = torch.sigmoid(self.u * y_me + self.v * p + self.b)
+        return g * p
+
+
 class MFNDeepStack(nn.Module):
     def __init__(self, config):
         super().__init__()
+        zw = getattr(config, "zone_widths", None)
+        self.zone_mode = bool(zw) and getattr(config, "n_threads", 1) > 1
+        if self.zone_mode:
+            # --- MFN-2Z : chaque thread = une zone (largeurs/beta propres) ---
+            zs = [list(z) for z in zw]
+            L = len(zs[0])
+            assert all(len(z) == L for z in zs), "zones: même nb d'étages requis"
+            self.widths = zs[0]              # référence = zone 0 (emb dim)
+            self.zone_widths = zs
+            self.n_threads = config.n_threads
+            self.thread_fb = getattr(config, "thread_fb", True)
+            betas = getattr(config, "zone_betas", None) or [config.beta] * self.n_threads
+            emb_dim = zs[0][0]
+            self.stacks = nn.ModuleList()
+            for t in range(self.n_threads):
+                w_t, H0t = zs[t], zs[t][0]
+                layers = nn.ModuleList()
+                for l in range(L):
+                    h_in = emb_dim if l == 0 else w_t[l - 1]
+                    h_td = w_t[l + 1] if (config.topdown and l < L - 1) else None
+                    h_sk = w_t[0] if (config.skip_fb and l >= 2) else None
+                    layers.append(MFNDeepLayer(h_in, w_t[l], h_td, h_sk,
+                                               beta=betas[t]))
+                self.stacks.append(layers)
+            # lat[l][dst][src] entre zones de largeurs différentes
+            self.lat = nn.ModuleList()
+            if self.thread_fb and self.n_threads > 1:
+                for l in range(L - 1):
+                    pairs = nn.ModuleList()
+                    for dst in range(self.n_threads):
+                        pairs.append(nn.ModuleList(
+                            [LateralFBX(zs[src][l], zs[dst][l])
+                             for src in range(self.n_threads)]))
+                    self.lat.append(pairs)
+            head_in = 2 * sum(z[-1] for z in zs)
+            self.final_proj = nn.Linear(head_in, emb_dim)
+            return
         w = config.layer_widths
         self.widths = w
         self.n_threads = getattr(config, "n_threads", 1)
@@ -357,10 +419,12 @@ class MFNDeepForCausalLM(RecurrentStateCacheMixin, PreTrainedModel, GenerationMi
 
 
 def build_deep(model_id: str, vocab_size: int, widths, beta=0.2,
-               topdown=True, skip_fb=False, n_threads=1, thread_fb=True):
+               topdown=True, skip_fb=False, n_threads=1, thread_fb=True,
+               zone_widths=None, zone_betas=None):
     cfg = MFNDeepConfig(vocab_size=vocab_size, layer_widths=widths, beta=beta,
                         topdown=topdown, skip_fb=skip_fb,
-                        n_threads=n_threads, thread_fb=thread_fb)
+                        n_threads=n_threads, thread_fb=thread_fb,
+                        zone_widths=zone_widths, zone_betas=zone_betas)
     return MFNDeepForCausalLM(cfg)
 
 

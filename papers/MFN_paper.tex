@@ -29,8 +29,12 @@ protocols (identical data, tokenizer, seed). At equal parameter count and
 identical budgets, MFN outperforms a GRU and a GPT-2-mini baseline on
 TinyStories; its local data exponent $\alpha_D \approx 0.085$ is 33\%--65\%
 steeper than the same baselines and approaches the published
-$\alpha_D$-range of transformers. We preregister the falsifiable bar for the
-parameter exponent $\alpha_N$ against the published $\alpha_N = 0.076$.
+$\alpha_D$-range of transformers. We also preregistered a falsifiable bar
+for the parameter exponent $\alpha_N$ against the published $\alpha_N =
+0.076$: the completed matched-pair run \emph{falsifies} it at this data
+budget ($\alpha_N \approx -0.01$ at 8.65 tokens/parameter) --- a
+data-starvation signature that redirects the programme to the data axis,
+not an architectural verdict.
 \end{abstract}
 
 \section{Introduction}\label{sec:intro}
@@ -332,7 +336,7 @@ GRU & $[215]$ & -- & 1\,159\,710 & trained, $10^{-3}$, 4 ep \\
 GPT-2 mini & $4\times120$ & -- & 1\,250\,640 & trained, $10^{-3}$, 6 ep \\
 MFN 2L & $[192,96]$ & 1 & 2\,122\,368 & trained $5\!\times\!10^{-4}$, 4 ep$^\dagger$ \\
 MFN 3L & $[192,128,96]$ & 1 & 2\,612\,384 & trained $5\!\times\!10^{-4}$, 3 ep \\
-MFN 3L$_{1e-3}$ & $[192,128,96]$ & 1 & 2\,612\,384 & $10^{-3}$, 4 ep --- ep1 val 2.8317 (running) \\
+MFN 3L$_{1e-3}$ & $[192,128,96]$ & 1 & 2\,612\,384 & trained $10^{-3}$, 4 ep --- val 2.4135, test ppl 11.39 \\
 MFN 3L3T & $[192,128,96]$ & 3 & 6\,753\,888 & scheduled \\
 \bottomrule
 \end{tabular}
@@ -427,25 +431,37 @@ monotonically. The methodological lesson: repeated collapse at identical
 (data order is fixed; the state is not) --- gradient-anomaly tracing is the
 decisive tool.
 
-\subsection{Preregistered falsifiable prediction}
-The parameter exponent $\alpha_N$ will be estimated from the matched pair
-$P_0$ (MFN 1L, 1\,153\,440) and $P_4$ (MFN 3L$_{1e-3}$, 2\,612\,384), both
-at $10^{-3}$ for 4 epochs. With $L(N) = A N^{-\alpha_N}$, the bar
-$\alpha_N \ge 0.076$ (Kaplan et al., non-embedding params) requires
-$L_{P_4} \le 2.4013 \times (2.612/1.153)^{-0.076} \approx 2.26$ on total
-parameters, and $\le 2.4013 \times (1.826/0.564)^{-0.076} \approx 2.20$ on
-non-embedding parameters ($V\!=\!4096$ embeddings removed; ratio $3.24\times$).
-Proof in \texttt{phase5/proofs/proof\_A3\_phi\_and\_bar.py} (and
-\texttt{proof\_A1\_sigmoid\_beta.py} for the $\beta\,x^{\beta-1}$ cliff). This prediction was written to
-\texttt{phase5/scaling.md} before the run; the $2.30$ printed in v0.2--v0.4 was
-arithmetic error ($0.044$ nat high, corresponds to $\alpha\approx0.053$).
-\textbf{Interim observations:} epoch-1 val $2.8317$ (ppl 16.97) at $10^{-3}$
-vs $3.0541$ (ppl 21.20) at $5\times10^{-4}$ ($-0.22$); epoch-2 val $2.6017$
-(ppl 13.49) vs $2.7945$ at $5\times10^{-4}$ ($-0.19$). Remaining budget to the
-total-param bar $2.26$ is $-0.58$ nat over epochs 3--4 ($\approx-0.29$/ep) and
-to the non-embedding bar $2.20$ is $-0.64$ nat; the $5\times10^{-4}$
-trajectory's ep1$\to$ep2 gain was $-0.26$. The bar stands until the run ends
-(expected $\sim$17:40).
+\subsection{Preregistered falsifiable prediction --- result}\label{sec:prereg}
+The parameter exponent $\alpha_N$ was estimated from the matched pair
+$P_0$ (MFN 1L, 1\,153\,440) and $P_4$ (MFN 3L, 2\,612\,384), both at
+$10^{-3}$ for 4 epochs on the identical 22.6\,M-token stream. With
+$L(N) = A N^{-\alpha_N}$, the bar $\alpha_N \ge 0.076$ (Kaplan et al.)
+requires $L_{P_4} \le 2.4013 \times (2.612/1.153)^{-0.076} \approx 2.26$ on
+total parameters, or $\le 2.20$ on non-embedding parameters (ratio
+$3.24\times$). The prediction was written to \texttt{phase5/scaling.md}
+before the run; an earlier draft printed $\approx 2.30$, an arithmetic error
+($+0.044$ nat).
+
+\textbf{Outcome: the bar is falsified.} Final validation loss of the 3L run:
+$\mathbf{2.4135}$ (ppl 11.17; test ppl 11.39, vs.\ MFN~1L 11.20 and GRU
+11.58). The measured local exponent is $\alpha_N = -0.006$ (total params) /
+$-0.004$ (non-embedding)---flat at this scale. Three observations frame this
+result. \emph{(i) Per-epoch gains decay geometrically}: $-0.230$, $-0.116$,
+$-0.072$ from epochs 1--4 (ratio $\approx 0.5$--$0.62$); extrapolating the
+geometric tail puts the corpus asymptote near $2.30$, still above the bar ---
+more epochs at fixed data could not have reached it. \emph{(ii) Data
+starvation, not architecture}: at 22.6\,M tokens the 3L sees
+$8.65$ tokens/parameter versus $19.6$ for the 1L ($2.3\times$ below the
+Chinchilla-optimal ratio); added capacity cannot express itself in this
+regime, and the depth family indeed converges toward the 1L's loss rather
+than past it. \emph{(iii) The learning-rate effect holds independently}: the
+$10^{-3}$ run beats its $5\times10^{-4}$ twin at every matched epoch
+($-0.22$, $-0.19$, $-0.17$, $-0.14$), so the comparison is not a
+convergence artifact. The preregistered prediction did its job: it was
+falsifiable, and it was falsified. The measurement programme now moves to
+the data axis (\S\ref{sec:discussion}): a $\sim$2--3$\times$ larger unique
+corpus at $\approx$1 epoch is the cleanest test of whether MFN's
+$\alpha_N$ emerges once tokens/parameter approaches the Chinchilla ratio.
 
 \section{Discussion and scaling programme}\label{sec:discussion}
 \paragraph{Axis D (data).} $\alpha_D \approx 0.085$ (measured, local).
@@ -453,8 +469,12 @@ Target: confirm across sizes; the corpus is $\approx 10.7$ tokens/parameter
 at 2.1M parameters, i.e., below the Chinchilla-optimal $\approx 20$
 \citep{hoffmann2022chinchilla}; more unique data at matched token budget is
 the highest-ROI axis.
-\paragraph{Axis N (parameters).} One matched pair is running (the
-falsifiable bar above). Two-point fits are fragile; the reconciliation
+\paragraph{Axis N (parameters).} The matched pair $P_0$/$P_4$ is complete:
+the preregistered bar is \emph{falsified} at this data budget
+($\alpha_N \approx -0.01$; \S\ref{sec:prereg}). We read this as a
+data-limited regime (8.65 tokens/parameter, $2.3\times$ below Chinchilla),
+so the next $\alpha_N$ measurement requires a larger unique corpus first.
+Two-point fits are fragile; the reconciliation
 literature \citep{pearce2024reconciling,porian2024data} warns of
 small-scale curvature, so any $\alpha_N$ we report is a \emph{local}
 exponent.
@@ -483,12 +503,15 @@ learned fatigue, per-neuron gated top--down / skip / lateral feedback---and
 a controlled small-scale measurement protocol. Current evidence: MFN
 outperforms GRU and GPT-2-mini baselines at equal size and budget; its local
 data exponent is steeper than both; a single numerical cliff, root cause of
-three collapses, is identified and eliminated. The parameter exponent
-$\alpha_N$ is being measured now with a preregistered bar against the
-published transformer value. If MFN's exponents match or exceed the
-published ones at equal protocol, the ``scaling barrier" is not a law of
-nature but a property of inductive biases---and fatigue-driven multi-scale
-recurrence is a candidate for shifting it.
+three collapses, is identified and eliminated. The preregistered parameter
+exponent test completed and was falsified: at 8.65 tokens/parameter, depth
+converges to the single-layer loss ($\alpha_N \approx -0.01$) --- a data
+starvation signature rather than an architectural verdict, which redirects
+the programme to the data axis. If MFN's exponents match or exceed the
+published ones once tokens/parameter approaches the Chinchilla ratio, the
+``scaling barrier" is not a law of nature but a property of inductive
+biases---and fatigue-driven multi-scale recurrence is a candidate for
+shifting it.
 
 \bibliographystyle{abbrv}
 \begin{thebibliography}{99}
