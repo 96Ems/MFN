@@ -37,6 +37,14 @@ ARCHES = {
                 n_threads=2, thread_fb=True, fast=True,
                 zone_widths=[[160, 112, 80], [96, 64, 48]],
                 zone_betas=[0.2, 0.6], zone_rates=[1, 2]),
+    # --- Z10 : 2 zones asymetriques x 10 couches, FAST, B64
+    # A (large, reactive): [160..64] ; B (etroite, lente, rate 2): [96..40]
+    "z10": dict(widths=[160, 144, 128, 112, 96, 96, 96, 96, 80, 64],
+                topdown=True, skip_fb=True, n_threads=2, thread_fb=True,
+                fast=True,
+                zone_widths=[[160, 144, 128, 112, 96, 96, 96, 96, 80, 64],
+                             [96, 88, 80, 72, 64, 64, 64, 56, 48, 40]],
+                zone_betas=[0.2, 0.6], zone_rates=[1, 2]),
 }
 
 

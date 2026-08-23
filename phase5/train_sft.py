@@ -24,6 +24,8 @@ BASES = {
     "gru": os.path.join(P4, "gru"),
     "deep_2l": os.path.join(P5, "deep_2l"),
     "deep_3l": os.path.join(P5, "deep_3l"),
+    "deep_2zf": os.path.join(P5, "deep_2zf"),
+    "deep_z10": os.path.join(P5, "deep_z10"),
 }
 
 
