@@ -28,10 +28,10 @@ done
   done ) &
 TMPID=$!
 
-# 3) 2ZF @22.6M : zones asymetriques + moteur FAST (alpha-rec + zone B rate 2)
-echo "=== 2ZF TRAIN GO (B32, 2ep, lr 1e-3) $(date)" >> "$Q"
+# 3) 2ZF @22.6M : zones asymetriques + moteur FAST, B64 (bench: 2211 tok/s, x2.25 vs B32)
+echo "=== 2ZF TRAIN GO (B64, 2ep, lr 1e-3) $(date)" >> "$Q"
 env OMP_NUM_THREADS=2 ../.venv/bin/python -u train_deep.py --arch 2zf --epochs 2 \
-  --batch 32 --lr 1e-3 --cuda --eval-batch 32 --tag deep_2zf --out results_deep.json \
+  --batch 64 --lr 1e-3 --cuda --eval-batch 48 --tag deep_2zf --out results_deep.json \
   > ../logs/p5_2z.log 2>&1
 echo "=== done 2zf exit=$? $(date)" >> "$Q"
 kill $TMPID 2>/dev/null

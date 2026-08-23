@@ -538,12 +538,16 @@ class MFNDeepForCausalLM(RecurrentStateCacheMixin, PreTrainedModel, GenerationMi
             return CausalLMOutput(logits=logits, hidden_states=tuple(states))
 
         states = self.stack.init_state(emb.shape[0], emb.device)
-        logits = []
+        # Collecte-then-head : on empile les sorties de tous les t puis UN SEUL
+        # final_proj+LN+lm_head (1 gros GEMM au lieu de T petits) — le plus gros
+        # gisement de lancements de kernels (CPU-bound sur cette carte).
+        houts = []
         for t in range(emb.shape[1]):
             states, _ = self.stack.step(emb[:, t], states)
-            hout = self.stack.final_proj(self.stack.combine(states))
-            logits.append(self.lm_head(self.ln(hout)))
-        logits = torch.stack(logits, dim=1)
+            houts.append(self.stack.combine(states))
+        H = torch.stack(houts, dim=1)                    # (B, T, H_in)
+        hf = self.stack.final_proj(H)                    # (B, T, H0)
+        logits = self.lm_head(self.ln(hf))               # (B, T, V)
 
         loss = None
         if labels is not None:
