@@ -32,6 +32,11 @@ ARCHES = {
                n_threads=2, thread_fb=True,
                zone_widths=[[160, 112, 80], [96, 64, 48]],
                zone_betas=[0.2, 0.6]),
+    # --- 2ZF : MEME asymetrie, moteur FAST (recurrence-alpha + zone B rate 2)
+    "2zf": dict(widths=[160, 112, 80], topdown=True, skip_fb=True,
+                n_threads=2, thread_fb=True, fast=True,
+                zone_widths=[[160, 112, 80], [96, 64, 48]],
+                zone_betas=[0.2, 0.6], zone_rates=[1, 2]),
 }
 
 
@@ -165,6 +170,8 @@ def main():
 
     kw = dict(ARCHES[args.arch])
     zw, zb = kw.pop("zone_widths", None), kw.pop("zone_betas", None)
+    fast = kw.pop("fast", False)
+    zrates = kw.pop("zone_rates", None)
     tag = args.tag or f"deep_{args.arch}"
     ckpt_dir = os.path.join(CKPT, tag)
     # Historique des epochs 1-2 du run deep_2l interrompu (logs p5_2l.log) —
@@ -189,7 +196,8 @@ def main():
         if args.start_epoch > 1:
             print(f"[{tag}] --start-epoch {args.start_epoch} mais pas de "
                   f"checkpoint -> init fraîche", flush=True)
-        model = build_deep(tag, vocab, zone_widths=zw, zone_betas=zb, **kw).to(device)
+        model = build_deep(tag, vocab, zone_widths=zw, zone_betas=zb,
+                           fast=fast, zone_rates=zrates, **kw).to(device)
         history = []
     if args.compile:
         try:

@@ -39,6 +39,8 @@ class MFNDeepConfig(PretrainedConfig):
         initializer_range: float = 0.02,
         zone_widths=None,
         zone_betas=None,
+        fast: bool = False,
+        zone_rates=None,
         **kwargs,
     ):
         self.vocab_size = vocab_size
@@ -49,6 +51,11 @@ class MFNDeepConfig(PretrainedConfig):
         # zone_betas[t] = beta du psi-stream de la zone t (vitesse de conduction).
         self.zone_widths = [list(z) for z in zone_widths] if zone_widths else None
         self.zone_betas = list(zone_betas) if zone_betas else None
+        # --- MFN-FAST : recurrence-alpha (GRU deposes), fusion de kernels ---
+        self.fast = fast
+        # temporisation par zone : zone_rates[t] = nb de pas entre 2 calculs de
+        # la zone t (hold temporel, erreur bornee O(1-alpha_B), voir THEORY)
+        self.zone_rates = list(zone_rates) if zone_rates else None
         self.topdown = topdown
         self.skip_fb = skip_fb
         self.n_threads = n_threads
@@ -171,6 +178,119 @@ class MFNDeepLayer(nn.Module):
         return (h_lam, h_psi, phi_lam, phi_psi, y)
 
 
+class MFNAlphaLayer(nn.Module):
+    """Cellule FAST (theorie THEORY_2Z_FAST.md) : recurrence-alpha au lieu des
+    GRUCell (12H^2 -> 0), kernels fusionnes (gates/cross/fb en 1 Linear chacun),
+    extracteur de decroissance partage.  La fatigue fournit le 'reset'.
+    Complexite ~9H^2 vs ~22H^2 pour la cellule dense."""
+
+    def __init__(self, h_in, H, h_td=None, h_sk=None, beta=0.2):
+        super().__init__()
+        self.H = H
+        self.beta = beta
+        self.input_proj = nn.Linear(h_in, H)
+        # extracteur de decroissance partage : h_in -> 2H (une seule Linear)
+        self.decay_in = nn.Linear(h_in, 2 * H)
+        self.decay_lam_head = nn.Sequential(nn.ReLU(), nn.Linear(H, H), nn.Sigmoid())
+        self.decay_psi_head = nn.Sequential(nn.ReLU(), nn.Linear(H, H), nn.Sigmoid())
+        # feedback fusionne : Linear(H, 2H) sur (h_lam_eff; h_psi_eff) empiles
+        self.fb = nn.Linear(H, 2 * H)
+        # cross-stream fusionne : Linear(H, 2H) sur (h_psi; h_lam_star) empiles
+        self.cross = nn.Linear(H, 2 * H, bias=False)
+        # portes de confiance fusionnees : Linear(2H, 2H), moities p2l/l2p
+        self.gate = nn.Linear(2 * H, 2 * H)
+        self.w_gamma_lam = nn.Parameter(torch.zeros(H))
+        self.w_gamma_psi = nn.Parameter(torch.zeros(H))
+        self.readout = nn.Linear(2 * H, H)
+        if h_td is not None:
+            self.W_td = nn.Linear(h_td, H)
+            self.td_lam_u = nn.Parameter(torch.zeros(H))
+            self.td_lam_v = nn.Parameter(torch.zeros(H))
+            self.td_lam_b = nn.Parameter(torch.zeros(H))
+            self.td_psi_u = nn.Parameter(torch.zeros(H))
+            self.td_psi_v = nn.Parameter(torch.zeros(H))
+            self.td_psi_b = nn.Parameter(torch.zeros(H))
+        if h_sk is not None:
+            self.W_sk = nn.Linear(h_sk, H)
+            self.sk_lam_u = nn.Parameter(torch.zeros(H))
+            self.sk_lam_v = nn.Parameter(torch.zeros(H))
+            self.sk_lam_b = nn.Parameter(torch.zeros(H))
+            self.sk_psi_u = nn.Parameter(torch.zeros(H))
+            self.sk_psi_v = nn.Parameter(torch.zeros(H))
+            self.sk_psi_b = nn.Parameter(torch.zeros(H))
+
+    @staticmethod
+    def init_state(batch, H, device="cpu"):
+        z = lambda: torch.zeros(batch, H, device=device)
+        return z(), z(), z(), z(), z()  # h_lam, h_psi, phi_lam, phi_psi, y
+
+    def forward(self, u, st, y_td, y_sk):
+        h_lam, h_psi, phi_lam, phi_psi, _ = st
+        H = self.H
+        gamma_lam = torch.sigmoid(self.w_gamma_lam)
+        gamma_psi = torch.sigmoid(self.w_gamma_psi)
+        h_lam_eff = h_lam * (1.0 - phi_lam).clamp_min(0)
+        h_psi_eff = h_psi * (1.0 - phi_psi).clamp_min(0)
+        xp = self.input_proj(u)
+
+        # decroissance : extracteur partage, tetes separees
+        z = self.decay_in(u)                              # (B, 2H)
+        alpha_lam = self.decay_lam_head(z[:, :H])         # (B, H)
+        alpha_psi = self.decay_psi_head(z[:, H:]).clamp_min(1e-6) ** self.beta
+
+        # portes fusionnees : X = stack([hpsi;hlam], [hlam;hpsi]) -> 1 kernel
+        joint = torch.stack([torch.cat([h_psi_eff, h_lam_eff], dim=-1),
+                             torch.cat([h_lam_eff, h_psi_eff], dim=-1)], dim=0)
+        g = torch.sigmoid(self.gate(joint))               # (2, B, 2H)
+        g_p2l, g_l2p = g[0, :, :H], g[1, :, H:]
+
+        # feedback fusionne
+        feats = torch.stack([h_lam_eff, h_psi_eff], dim=0)  # (2, B, H)
+        F = self.fb(feats)                                 # (2, B, 2H)
+        fb_lam = F[0, :, :H] * alpha_lam * g_p2l
+        fb_psi = F[1, :, H:] * alpha_psi * g_l2p
+
+        mix_lam = xp + fb_lam
+        if y_td is not None:  # top-down (t-1)
+            td = self.W_td(y_td)
+            gd = torch.sigmoid(self.td_lam_u * h_lam_eff + self.td_lam_v * td
+                               + self.td_lam_b)
+            mix_lam = mix_lam + gd * td
+        if y_sk is not None:
+            sk = self.W_sk(y_sk)
+            gd = torch.sigmoid(self.sk_lam_u * h_lam_eff + self.sk_lam_v * sk
+                               + self.sk_lam_b)
+            mix_lam = mix_lam + gd * sk
+        # cross fusionne : S = stack([h_psi_eff, h_lam_star])
+        S = torch.stack([h_psi_eff, h_lam_eff], dim=0)
+        C = self.cross(S)                                  # (2, B, 2H)
+        mix_lam = mix_lam + C[0, :, :H]
+
+        # recurrence-alpha (le gate d'oubli = alpha, deja calcule)
+        h_lam = alpha_lam * h_lam + (1.0 - alpha_lam) * torch.tanh(mix_lam)
+
+        h_lam_star = h_lam * (1.0 - phi_lam).clamp_min(0)
+        S2 = torch.stack([h_lam_star, h_lam_star], dim=0)  # placeholder 2e entree
+        C2 = self.cross(S2)                                # (2, B, 2H)
+        mix_psi = xp + fb_psi + C2[1, :, H:]
+        if y_td is not None:
+            gd = torch.sigmoid(self.td_psi_u * h_psi_eff + self.td_psi_v * td
+                               + self.td_psi_b)
+            mix_psi = mix_psi + gd * td
+        if y_sk is not None:
+            gd = torch.sigmoid(self.sk_psi_u * h_psi_eff + self.sk_psi_v * sk
+                               + self.sk_psi_b)
+            mix_psi = mix_psi + gd * sk
+        h_psi = alpha_psi * h_psi + (1.0 - alpha_psi) * torch.tanh(mix_psi)
+
+        phi_lam = (gamma_lam * phi_lam + (1.0 - gamma_lam) * h_lam.abs()).clamp(0, 1)
+        phi_psi = (gamma_psi * phi_psi + (1.0 - gamma_psi) * h_psi.abs()).clamp(0, 1)
+        h_lam_out = h_lam * (1.0 - phi_lam).clamp_min(0)
+        h_psi_out = h_psi * (1.0 - phi_psi).clamp_min(0)
+        y = self.readout(torch.cat([h_lam_out, h_psi_out], dim=-1))
+        return (h_lam, h_psi, phi_lam, phi_psi, y)
+
+
 class LateralFB(nn.Module):
     """Feedback latéral entre threads (même recette que le topdown intra-thread :
     projection + gate per-neuron sigmoïde sur (état_self, état_other))."""
@@ -220,7 +340,9 @@ class MFNDeepStack(nn.Module):
             self.n_threads = config.n_threads
             self.thread_fb = getattr(config, "thread_fb", True)
             betas = getattr(config, "zone_betas", None) or [config.beta] * self.n_threads
+            rates = getattr(config, "zone_rates", None) or [1] * self.n_threads
             emb_dim = zs[0][0]
+            LayerCls = MFNAlphaLayer if getattr(config, "fast", False) else MFNDeepLayer
             self.stacks = nn.ModuleList()
             for t in range(self.n_threads):
                 w_t, H0t = zs[t], zs[t][0]
@@ -229,9 +351,12 @@ class MFNDeepStack(nn.Module):
                     h_in = emb_dim if l == 0 else w_t[l - 1]
                     h_td = w_t[l + 1] if (config.topdown and l < L - 1) else None
                     h_sk = w_t[0] if (config.skip_fb and l >= 2) else None
-                    layers.append(MFNDeepLayer(h_in, w_t[l], h_td, h_sk,
-                                               beta=betas[t]))
+                    layers.append(LayerCls(h_in, w_t[l], h_td, h_sk,
+                                           beta=betas[t]))
                 self.stacks.append(layers)
+            self.zone_rates = rates
+            self.tick = 0
+            self.y0_last = [None] * self.n_threads
             # lat[l][dst][src] entre zones de largeurs différentes
             self.lat = nn.ModuleList()
             if self.thread_fb and self.n_threads > 1:
@@ -308,21 +433,33 @@ class MFNDeepStack(nn.Module):
 
     def _step_N(self, emb, states):
         """Step grillage (n_threads>1) : tous les threads calculent la couche
-        l, puis feedback latéral mélange leurs y frais (u de la couche l+1)."""
+        l, puis feedback latéral mélange leurs y frais (u de la couche l+1).
+        zones FAST : les zones a rate>1 sont TENUES (state+readout inchanges)
+        aux pas intermediaires (THEORY_2Z_FAST.md, sec. 2)."""
         L = len(self.widths)
         new_threads = []
         y_l = [None] * self.n_threads
         y0_fresh = [None] * self.n_threads
+        rates = getattr(self, "zone_rates", None) or [1] * self.n_threads
+        if not hasattr(self, "tick"):
+            self.tick = 0
+        compute_t = [self.tick % rates[t] == 0 for t in range(self.n_threads)]
+        self.tick += 1
         for l in range(L):
             st_new_t = []
             for t in range(self.n_threads):
+                if not compute_t[t]:
+                    st_new_t.append(states[t][l])      # HOLD (5-tuple complet)
+                    continue
                 lay = self.stacks[t][l]
                 u = emb if l == 0 else y_l[t]
                 y_td = states[t][l + 1][4] if hasattr(lay, "W_td") else None
-                y_sk = y0_fresh[t] if hasattr(lay, "W_sk") else None
+                y_sk = (y0_fresh[t] if y0_fresh[t] is not None
+                        else self.y0_last[t]) if hasattr(lay, "W_sk") else None
                 st_new_t.append(lay(u, states[t][l], y_td, y_sk))
-            if l == 0:
-                y0_fresh = [st_new_t[t][4] for t in range(self.n_threads)]
+                if l == 0:
+                    y0_fresh[t] = st_new_t[-1][4]
+                    self.y0_last[t] = st_new_t[-1][4]
             if self.thread_fb and l < L - 1:
                 # Fix A2 (proof /tmp/proof_A2_lateral.py): gate must see fixed y_self, not accumulating acc.
                 # Previously acc threaded through gate -> order-dependent (Δ0.06). Now y_self fixed -> order-independent, matches Eq. lateral.
@@ -420,11 +557,12 @@ class MFNDeepForCausalLM(RecurrentStateCacheMixin, PreTrainedModel, GenerationMi
 
 def build_deep(model_id: str, vocab_size: int, widths, beta=0.2,
                topdown=True, skip_fb=False, n_threads=1, thread_fb=True,
-               zone_widths=None, zone_betas=None):
+               zone_widths=None, zone_betas=None, fast=False, zone_rates=None):
     cfg = MFNDeepConfig(vocab_size=vocab_size, layer_widths=widths, beta=beta,
                         topdown=topdown, skip_fb=skip_fb,
                         n_threads=n_threads, thread_fb=thread_fb,
-                        zone_widths=zone_widths, zone_betas=zone_betas)
+                        zone_widths=zone_widths, zone_betas=zone_betas,
+                        fast=fast, zone_rates=zone_rates)
     return MFNDeepForCausalLM(cfg)
 
 
