@@ -337,6 +337,7 @@ GPT-2 mini & $4\times120$ & -- & 1\,250\,640 & trained, $10^{-3}$, 6 ep \\
 MFN 2L & $[192,96]$ & 1 & 2\,122\,368 & trained $5\!\times\!10^{-4}$, 4 ep$^\dagger$ \\
 MFN 3L & $[192,128,96]$ & 1 & 2\,612\,384 & trained $5\!\times\!10^{-4}$, 3 ep \\
 MFN 3L$_{1e-3}$ & $[192,128,96]$ & 1 & 2\,612\,384 & trained $10^{-3}$, 4 ep --- val 2.4135, test ppl 11.39 \\
+MFN 2ZF & $2\times[160,112,80]/[96,64,48]$ & 2 & 1\,814\,000 & trained $10^{-3}$, 2 ep --- val 2.5352, test ppl 12.85 \\
 MFN 3L3T & $[192,128,96]$ & 3 & 6\,753\,888 & scheduled \\
 \bottomrule
 \end{tabular}
@@ -381,6 +382,43 @@ MFN 3L (2\,612\,384) & 3.0541 & \textbf{2.7945} & \textbf{2.6582} & 14.53 \\
 \bottomrule
 \end{tabular}
 \end{table}
+
+\subsection{The FAST zone model (2ZF)}\label{sec:2zf}
+\paragraph{Motivation.} The dense dual-stream cell spends $45\%$ of its
+FLOPs in two per-stream \texttt{GRUCell}s whose update gate $z$ duplicates
+the input-conditioned decay $\alpha$ already computed by the cell's own
+MLPs (the architecture's original paper already described
+$h \leftarrow \alpha \odot h + (1-\alpha)\odot\tanh(\text{mix})$ as the
+recurrence, Mamba-$\Delta$-style). \textbf{FAST cell:} we replace both GRUs
+by $\alpha$-recurrence per stream, keep the $\tanh$ candidate, let the
+fatigue accumulator $\varphi$ play the \emph{reset} role
+($\tilde h = h \odot (1-\varphi)$), and fuse pairing operations into single
+kernels (gates $2H{\to}2H$, cross-stream, within-stream feedback); the per-
+layer cost drops from $\sim$22$H^2$ to $\sim$9$H^2$.
+\paragraph{Learned temporal zones.} The two asymmetric zones
+($A$: widths $[160,112,80]$, $\beta{=}0.2$, computed every step; $B$:
+$[96,64,48]$, $\beta{=}0.6$, updated on alternate steps --- state-hold with
+bounded error $\leq 2(1-\alpha_B)$, amortized by the slow stream's
+integrative dynamics) instantiate a \emph{learned} clockwork hierarchy per
+zone rather than per fixed neuron groups.
+\paragraph{Measurements (22.6\,M tokens, $10^{-3}$, B64).}
+Throughput 2\,202 tok/s --- 2.6$\times$ the dense zone model (849 tok/s),
+matching the theory's prediction (1\,826--2\,739). At equal epochs the
+1.81\,M-parameter 2ZF \emph{beats} the 2.61\,M 3L:
+\begin{center}\small
+\begin{tabular}{lcccc}
+\toprule
+Model & params & ep1 val & ep2 val & final \\ \midrule
+MFN 3L & 2\,612\,384 & 2.8317 & 2.6017 & val 2.4135 (4 ep), ppl 11.39 \\
+\textbf{MFN 2ZF} & \textbf{1\,814\,000} & \textbf{2.7765} & \textbf{2.5352} & test ppl 12.85 (2 ep) \\
+\bottomrule
+\end{tabular}
+\end{center}
+$\Rightarrow$ the GRU cells did not carry capacity (falsifiable prediction
+\#2 of the theory, \texttt{phase5/THEORY\_2Z\_FAST.md}, confirmed); the
+$\alpha$-recurrence + fatigue is both cheaper and per-epoch better at equal
+protocol. The 2ZF is currently the base for the instruction-following
+(UltraChat) SFT and for the 10-stage asymmetric depth test (Z10).
 
 \subsection{Data exponent $\alpha_D$}\label{sec:ad}
 For each model, we fit $\log L = a + \alpha_D \log D$ over the validation

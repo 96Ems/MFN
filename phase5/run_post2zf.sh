@@ -37,10 +37,11 @@ thermoguard() {
   done
 }
 
-# 1) SFT UltraChat sur le 2ZF (2 epochs, batch 32 seq 256, lr 1e-4)
-echo "=== SFT deep_2zf @UltraChat (2ep) $(date)" >> "$Q"
+# 1) SFT UltraChat sur le 2ZF (2 epochs, B64 seq128 = ~2200 tok/s, launch-bound:
+#    le tok/s depend du nb de pas temporels — seq256 le divisait par 2)
+echo "=== SFT deep_2zf @UltraChat (2ep, B64 seq128) $(date)" >> "$Q"
 env OMP_NUM_THREADS=2 ../.venv/bin/python -u train_sft.py --base deep_2zf \
-  --epochs 2 --batch 32 --seq 256 --lr 1e-4 --cuda --threads 2 \
+  --epochs 2 --batch 64 --seq 128 --lr 1e-4 --cuda --threads 2 \
   --out results_sft.json > ../logs/p5_sft_2zf.log 2>&1 &
 SFT_PID=$!
 thermoguard $SFT_PID &
