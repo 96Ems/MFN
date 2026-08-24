@@ -77,6 +77,8 @@ def load_data(data_dir=DATA):
 
 def run_epoch(model, train_ids, optimizer, args, device):
     model.train()
+    scaler = torch.amp.GradScaler(device) if getattr(args, "amp", False) \
+        and device != "cpu" else None
     N = train_ids.shape[0]
     L = (N - 1) // (args.batch * args.seq) * (args.batch * args.seq)
     x = train_ids[0:L].view(args.batch, -1, args.seq)
@@ -105,7 +107,12 @@ def run_epoch(model, train_ids, optimizer, args, device):
             args.lr * 0.5 * (1 + np.cos(np.pi * min((s - warmup) / max(steps * args.epochs - warmup, 1), 1)))
         for g in optimizer.param_groups:
             g["lr"] = lr
-        out = model(x[:, s].to(device), labels=y[:, s].to(device), return_dict=True)
+        if args.amp and device != "cpu":
+            with torch.autocast(device, dtype=torch.float16):
+                out = model(x[:, s].to(device), labels=y[:, s].to(device),
+                            return_dict=True)
+        else:
+            out = model(x[:, s].to(device), labels=y[:, s].to(device), return_dict=True)
         loss = out.loss
         li = loss.item()
         outlier = ema is not None and li > 4.0 * ema + 4.0
@@ -123,7 +130,11 @@ def run_epoch(model, train_ids, optimizer, args, device):
         bad_steps = 0
         ema = li if ema is None else 0.99 * ema + 0.01 * li
         optimizer.zero_grad(set_to_none=True)
-        loss.backward()
+        if scaler is not None:
+            scaler.scale(loss).backward()
+            scaler.unscale_(optimizer)   # dé-scale AVANT clip/step
+        else:
+            loss.backward()
         gn = torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
         if not torch.isfinite(gn):
             bad_steps += 1
@@ -134,7 +145,11 @@ def run_epoch(model, train_ids, optimizer, args, device):
             if bad_steps >= 50:
                 abort("divergence détectée par grad NaN")
             continue
-        optimizer.step()
+        if scaler is not None:
+            scaler.step(optimizer)       # skip interne si grads inf/NaN
+            scaler.update()
+        else:
+            optimizer.step()
         with torch.no_grad():
             for p, sp in zip(model.parameters(), shadow):
                 sp.copy_(p)
@@ -146,14 +161,18 @@ def run_epoch(model, train_ids, optimizer, args, device):
 
 
 @torch.no_grad()
-def evaluate(model, ids, device, batch=16, seq=128):
+def evaluate(model, ids, device, batch=16, seq=128, amp=False):
     model.eval()
     L = (ids.shape[0] - 1) // (batch * seq) * (batch * seq)
     x = ids[0:L].view(batch, -1, seq)
     y = ids[1:L + 1].view(batch, -1, seq)
     total, n = 0.0, 0
     for s in range(x.shape[1]):
-        out = model(x[:, s].to(device), labels=y[:, s].to(device), return_dict=True)
+        if amp and device != "cpu":
+            with torch.autocast(device, dtype=torch.float16):
+                out = model(x[:, s].to(device), labels=y[:, s].to(device), return_dict=True)
+        else:
+            out = model(x[:, s].to(device), labels=y[:, s].to(device), return_dict=True)
         total += out.loss.item() * y[:, s].numel()
         n += y[:, s].numel()
     return total / n
@@ -182,6 +201,13 @@ def main():
     ap.add_argument("--compile", action="store_true",
                     help="torch.compile mode reduce-overhead (CUDA graphs) — "
                          "fallback eager si indisponible sur cette carte")
+    ap.add_argument("--grad-ckpt", action="store_true",
+                    help="gradient checkpointing par couche/pas (M1 16G: "
+                         "activations ~ /4.5, gradients identiques, "
+                         "~+33% temps) — voir REPORT_MAC.md")
+    ap.add_argument("--amp", action="store_true",
+                    help="autocast fp16 + GradScaler (mps/cuda) : activations "
+                         "/2 + GEMMs plus rapides — voir REPORT_MAC.md")
     ap.add_argument("--eval-batch", type=int, default=16)
     ap.add_argument("--data", default=DATA,
                     help="dir contenant train/validation/test.npy + stats.json "
@@ -229,6 +255,8 @@ def main():
                         "ppl": 14.27, "bpc": 0.9675, "tok_s": 4125.0}]}
     if args.start_epoch > 1 and os.path.isdir(ckpt_dir):
         model = MFNDeepForCausalLM.from_pretrained(ckpt_dir).to(device)
+        # le flag n'est pas persisté dans les vieux checkpoints -> ré-armé ici
+        model.stack.use_checkpoint = args.grad_ckpt
         history = [e for e in BACKFILL.get(args.arch, [])
                    if e["epoch"] < args.start_epoch]
         print(f"[{tag}] RESUMING from {ckpt_dir} — reprise à l'epoch "
@@ -238,7 +266,8 @@ def main():
             print(f"[{tag}] --start-epoch {args.start_epoch} mais pas de "
                   f"checkpoint -> init fraîche", flush=True)
         model = build_deep(tag, vocab, zone_widths=zw, zone_betas=zb,
-                           fast=fast, zone_rates=zrates, **kw).to(device)
+                           fast=fast, zone_rates=zrates,
+                           use_checkpoint=args.grad_ckpt, **kw).to(device)
         history = []
     if args.compile:
         try:
@@ -276,7 +305,7 @@ def main():
     for ep in range(args.start_epoch, args.epochs + 1):
         t0 = time.time()
         train_loss, tok_s = run_epoch(model, train_ids, optimizer, args, device)
-        val_loss = evaluate(model, val_ids, device, batch=args.eval_batch)
+        val_loss = evaluate(model, val_ids, device, batch=args.eval_batch, amp=args.amp)
         ppl = float(np.exp(val_loss))
         bpc = val_loss * stats["validation"]["tokens_per_char"] / np.log(2.0)
         print(f"[{tag}] epoch {ep}/{args.epochs}: train {train_loss:.4f} | "
@@ -293,7 +322,7 @@ def main():
 
     best_dir = os.path.join(CKPT, tag)
     best_model = type(model).from_pretrained(best_dir).to(device)
-    test_loss = evaluate(best_model, test_ids, device, batch=args.eval_batch)
+    test_loss = evaluate(best_model, test_ids, device, batch=args.eval_batch, amp=args.amp)
     ppl_t, bpc_t = float(np.exp(test_loss)), \
         test_loss * stats["test"]["tokens_per_char"] / np.log(2.0)
     print(f"[{tag}] TEST loss {test_loss:.4f} ppl {ppl_t:.2f} bpc {bpc_t:.4f}", flush=True)

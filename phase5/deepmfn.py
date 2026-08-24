@@ -14,6 +14,7 @@ readout is bottlenecked to H_0 so the LM head stays tied to the embedding.
 """
 import torch
 import torch.nn as nn
+from torch.utils.checkpoint import checkpoint
 from transformers import (
     AutoConfig, AutoModelForCausalLM, GenerationMixin, PretrainedConfig,
     PreTrainedModel,
@@ -41,6 +42,7 @@ class MFNDeepConfig(PretrainedConfig):
         zone_betas=None,
         fast: bool = False,
         zone_rates=None,
+        use_checkpoint: bool = False,
         **kwargs,
     ):
         self.vocab_size = vocab_size
@@ -56,6 +58,9 @@ class MFNDeepConfig(PretrainedConfig):
         # temporisation par zone : zone_rates[t] = nb de pas entre 2 calculs de
         # la zone t (hold temporel, erreur bornee O(1-alpha_B), voir THEORY)
         self.zone_rates = list(zone_rates) if zone_rates else None
+        # gradient checkpointing par couche/pas (M1 16G : activations / ~4.5,
+        # gradients IDENTIQUES — recompute; coût ~+33% temps. Voir REPORT_MAC.)
+        self.use_checkpoint = use_checkpoint
         self.topdown = topdown
         self.skip_fb = skip_fb
         self.n_threads = n_threads
@@ -328,6 +333,9 @@ class LateralFBX(nn.Module):
 class MFNDeepStack(nn.Module):
     def __init__(self, config):
         super().__init__()
+        # FIX M1: lire le flag AVANT tout (était manquant -> ckpt jamais actif,
+        # les benches OOM s'expliquaient par le graphe complet retenu)
+        self.use_checkpoint = getattr(config, "use_checkpoint", False)
         zw = getattr(config, "zone_widths", None)
         self.zone_mode = bool(zw) and getattr(config, "n_threads", 1) > 1
         if self.zone_mode:
@@ -416,6 +424,13 @@ class MFNDeepStack(nn.Module):
         return [[lay.init_state(batch, lay.H, device) for lay in st]
                 for st in self.stacks]
 
+    def _layer_call(self, lay, u, st, y_td, y_sk):
+        """Appel de couche, avec checkpointing optionnel (gradients
+        identiques: recompute en backward; actif seulement si grad on)."""
+        if getattr(self, "use_checkpoint", False) and torch.is_grad_enabled():
+            return checkpoint(lay, u, st, y_td, y_sk, use_reentrant=False)
+        return lay(u, st, y_td, y_sk)
+
     def _step_1(self, emb, states):
         """Step original (n_threads=1), bit-identique à l'avant-grillage."""
         new_states, y_l = [], None
@@ -424,7 +439,7 @@ class MFNDeepStack(nn.Module):
             u = emb if l == 0 else y_l
             y_td = states[l + 1][4] if hasattr(lay, "W_td") else None
             y_sk = y0_fresh if hasattr(lay, "W_sk") else None
-            st_new = lay(u, st, y_td, y_sk)
+            st_new = self._layer_call(lay, u, st, y_td, y_sk)
             new_states.append(st_new)
             y_l = st_new[4]
             if l == 0:
@@ -456,7 +471,8 @@ class MFNDeepStack(nn.Module):
                 y_td = states[t][l + 1][4] if hasattr(lay, "W_td") else None
                 y_sk = (y0_fresh[t] if y0_fresh[t] is not None
                         else self.y0_last[t]) if hasattr(lay, "W_sk") else None
-                st_new_t.append(lay(u, states[t][l], y_td, y_sk))
+                st_new_t.append(self._layer_call(lay, u, states[t][l],
+                                                 y_td, y_sk))
                 if l == 0:
                     y0_fresh[t] = st_new_t[-1][4]
                     self.y0_last[t] = st_new_t[-1][4]
@@ -561,12 +577,14 @@ class MFNDeepForCausalLM(RecurrentStateCacheMixin, PreTrainedModel, GenerationMi
 
 def build_deep(model_id: str, vocab_size: int, widths, beta=0.2,
                topdown=True, skip_fb=False, n_threads=1, thread_fb=True,
-               zone_widths=None, zone_betas=None, fast=False, zone_rates=None):
+               zone_widths=None, zone_betas=None, fast=False, zone_rates=None,
+               use_checkpoint=False):
     cfg = MFNDeepConfig(vocab_size=vocab_size, layer_widths=widths, beta=beta,
                         topdown=topdown, skip_fb=skip_fb,
                         n_threads=n_threads, thread_fb=thread_fb,
                         zone_widths=zone_widths, zone_betas=zone_betas,
-                        fast=fast, zone_rates=zone_rates)
+                        fast=fast, zone_rates=zone_rates,
+                        use_checkpoint=use_checkpoint)
     return MFNDeepForCausalLM(cfg)
 
 
