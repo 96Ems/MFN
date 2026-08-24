@@ -62,13 +62,20 @@ def iter_stories(path):
         yield idx, "\n".join(buf)
 
 
-def build_split(path, n, tag, exclude=None, total_hint=2_119_718):
+def count_stories(path):
+    """Nombre réel d'histoires (lignes == MARKER) — même définition que v1."""
+    return sum(1 for line in open(path, encoding="utf-8") if line.strip() == MARKER)
+
+
+def build_split(path, n, tag, exclude=None):
     os.makedirs(STOR, exist_ok=True)
-    hints = {"train": 2_119_718, "validation": 21_989, "test": 21_989}
-    total_hint = hints[tag] if total_hint is None else total_hint
+    # FIX M1: le pool doit être le nombre RÉEL d'histoires du fichier
+    # (valid.txt = 2199, pas 21_989) — sinon la quasi-totalité des indices
+    # tirés n'existe jamais et val/test sortent quasi vides (bug constaté :
+    # 2659 tokens au lieu de ~438K). Fidèle à build_bigdata.py v1.
+    pool_max = count_stories(path)
     rng = random.Random({"train": 10, "validation": 11, "test": 12}[tag])
-    pool_max = total_hint
-    keep = set(rng.sample(range(pool_max), n))
+    keep = set(rng.sample(range(pool_max), min(n, pool_max)))
     if exclude:
         keep -= exclude
     print(f"[{tag}] cible={n} gardés(après excl.)={len(keep)}", flush=True)
