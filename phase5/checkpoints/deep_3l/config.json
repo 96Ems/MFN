@@ -1,0 +1,27 @@
+{
+  "architectures": [
+    "MFNDeepForCausalLM"
+  ],
+  "auto_map": {
+    "AutoConfig": "deepmfn.MFNDeepConfig",
+    "AutoModelForCausalLM": "deepmfn.MFNDeepForCausalLM"
+  },
+  "beta": 0.2,
+  "bos_token_id": 0,
+  "dropout": 0.0,
+  "dtype": "float32",
+  "eos_token_id": 0,
+  "initializer_range": 0.02,
+  "layer_widths": [
+    192,
+    128,
+    96
+  ],
+  "model_type": "mfn_deep_lm",
+  "pad_token_id": 0,
+  "skip_fb": true,
+  "tie_word_embeddings": true,
+  "topdown": true,
+  "transformers_version": "5.15.1",
+  "vocab_size": 4096
+}

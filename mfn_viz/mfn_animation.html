@@ -1,0 +1,964 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MyelinFatigueNet — visualisation 3D du modèle</title>
+<style>
+  :root{
+    --bg:#05070f;
+    --panel:rgba(10,16,30,.74);
+    --border:rgba(255,255,255,.09);
+    --txt:#dbe4f5;
+    --txt-dim:#8fa0bf;
+    --orange:#ff9b2f; --green:#3fd66f; --blue:#4f8cff; --purple:#b07af0;
+  }
+  *{margin:0;padding:0;box-sizing:border-box}
+  html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);
+    font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:var(--txt)}
+  #scene{position:absolute;inset:0;display:block;width:100%;height:100%;cursor:grab}
+  #scene.dragging{cursor:grabbing}
+
+  .panel{position:absolute;background:var(--panel);border:1px solid var(--border);
+    border-radius:14px;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+    padding:14px 16px;pointer-events:none;box-shadow:0 8px 30px rgba(0,0,0,.45);
+    z-index:5;line-height:1.45}
+
+  /* ---- titre ---- */
+  #title{top:18px;left:18px;max-width:440px}
+  #title h1{font-size:17px;font-weight:700;letter-spacing:.3px;
+    background:linear-gradient(90deg,var(--orange),var(--green));
+    -webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+  #title p{font-size:12px;color:var(--txt-dim);margin-top:4px}
+  #title .code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11px;
+    color:#6f82a8;margin-top:6px}
+
+  /* ---- stats ---- */
+  #stats{top:18px;right:18px;width:240px;font-size:12px}
+  #stats .row{display:flex;align-items:center;gap:8px;margin:7px 0}
+  #stats .lbl{width:118px;color:var(--txt-dim);flex:none}
+  #stats .bar{flex:1;height:7px;border-radius:4px;background:rgba(255,255,255,.07);overflow:hidden}
+  #stats .fill{height:100%;border-radius:4px;transition:width .2s linear}
+  #stats .val{width:38px;text-align:right;font-family:ui-monospace,Menlo,monospace;font-size:11px;flex:none}
+  #stats .token{font-family:ui-monospace,Menlo,monospace;font-size:13px;color:#fff;margin-top:2px}
+  #stats .t{color:var(--txt-dim)}
+
+  /* ---- légende ---- */
+  #legend{bottom:18px;left:18px;max-width:480px;font-size:11.5px;color:var(--txt-dim)}
+  #legend .sw{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;vertical-align:-1px}
+  #legend .ln{border-left:3px solid #e09a3a;border-radius:2px;padding-left:6px;margin-right:4px}
+  #legend b{color:var(--txt);font-weight:600}
+  #legend .k{margin:5px 0}
+
+  /* ---- contrôles ---- */
+  #controls{bottom:18px;right:18px;pointer-events:auto;width:272px}
+  #controls .btns{display:flex;gap:8px;margin-bottom:12px}
+  #controls button{flex:1;padding:8px 0;border-radius:9px;border:1px solid var(--border);
+    background:rgba(255,255,255,.06);color:var(--txt);font-size:13px;cursor:pointer;
+    transition:background .15s;font-weight:600}
+  #controls button:hover{background:rgba(255,255,255,.13)}
+  #controls button.primary{background:linear-gradient(90deg,#3a2a12,#14321c);
+    border-color:rgba(255,155,47,.35)}
+  #controls .sl{display:flex;align-items:center;gap:8px;margin:9px 0;font-size:12px}
+  #controls .sl label{width:110px;flex:none;color:var(--txt-dim)}
+  #controls .sl input[type=range]{flex:1;min-width:0;accent-color:var(--orange)}
+  #controls .sl b{width:40px;text-align:right;font-family:ui-monospace,Menlo,monospace;
+    font-size:11px;color:var(--txt);font-weight:500}
+  #controls .sl input[type=checkbox]{width:18px;height:18px;accent-color:#3fd66f}
+  #controls .hint{font-size:10.5px;color:#66789c;margin-top:10px;line-height:1.5}
+
+  /* ---- tooltip ---- */
+  #tip{position:absolute;pointer-events:none;background:rgba(8,12,24,.92);
+    border:1px solid var(--border);border-radius:9px;padding:8px 11px;font-size:11.5px;
+    color:var(--txt);z-index:20;display:none;white-space:nowrap;
+    font-family:ui-monospace,Menlo,monospace;box-shadow:0 6px 20px rgba(0,0,0,.5)}
+  #tip .hd{font-weight:700;margin-bottom:4px}
+  #tip .hd .c{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px}
+
+  #fallback{position:absolute;inset:0;display:none;align-items:center;justify-content:center;
+    flex-direction:column;gap:10px;color:var(--txt-dim);text-align:center;padding:40px}
+  @media (max-width:900px){
+    #stats{display:none}
+    #legend{max-width:46vw}
+    #controls{width:242px}
+  }
+</style>
+</head>
+<body>
+<canvas id="scene"></canvas>
+
+<div id="title" class="panel">
+  <h1>MyelinFatigueNet — visualisation 3D</h1>
+  <p>2 flux récurrents (Λ expressif / Ψ conceptuel) · portes de confiance bidirectionnelles ·
+     décroissance adaptative · fatigue neurale. Chaque impulsion lumineuse est de l'information
+     qui transite le long d'une synapse.</p>
+  <div class="code">d = 10 → H = 64 par flux (2 × 64) → d_out = 10 · neurones représentatifs 5 / 6 / 6 / 5
+    (comme draw_mfn.py)</div>
+</div>
+
+<div id="stats" class="panel">
+  <div class="row"><span class="t">pas&nbsp;t&nbsp;=</span><span class="token" id="stT">0</span></div>
+  <div class="row"><span class="lbl">token</span><span class="token" id="stTok">—</span></div>
+  <div class="row"><span class="lbl">fatigue φ̄ Λ</span>
+    <div class="bar"><div class="fill" id="stPhiL" style="width:0%;background:#ff5c5c"></div></div>
+    <span class="val" id="stPhiLv">0.00</span></div>
+  <div class="row"><span class="lbl">fatigue φ̄ Ψ</span>
+    <div class="bar"><div class="fill" id="stPhiP" style="width:0%;background:#ff5c5c"></div></div>
+    <span class="val" id="stPhiPv">0.00</span></div>
+  <div class="row"><span class="lbl">myéline M̄</span>
+    <div class="bar"><div class="fill" id="stMye" style="width:0%;background:#9fd8ff"></div></div>
+    <span class="val" id="stMyev">0.00</span></div>
+  <div class="row"><span class="lbl">impulsions</span><span class="token" id="stPul">0</span></div>
+</div>
+
+<div id="legend" class="panel">
+  <div class="k"><span class="sw" style="background:#4f8cff"></span><b>entrée e<sub>t</sub></b>
+    &nbsp;·&nbsp; <span class="sw" style="background:#ff9b2f"></span><b>Λ</b> flux expressif (GRU)
+    &nbsp;·&nbsp; <span class="sw" style="background:#3fd66f"></span><b>Ψ</b> flux conceptuel (GRU, α^0.2 lent)
+    &nbsp;·&nbsp; <span class="sw" style="background:#b07af0"></span><b>sortie y</b></div>
+  <div class="k">● <b>boule = neurone</b> — taille & éclat ∝ |h̃| = |h|·(1−φ) :
+    la fatigue <b>éteint</b> le neurone suractivé, qui <b>grisaille</b> (rotation de charge)</div>
+  <div class="k"><span style="color:#ff5c5c">◠</span> <b>arc rouge = fatigue φ</b>
+    (fraction du tour = niveau) — le seul vrai « self-loop » du modèle :
+    φᵢ = γᵢ·φᵢ + (1−γᵢ)·|hᵢ|, scalaire par neurone</div>
+  <div class="k"><span class="ln" style="border-color:#e09a3a"></span> <b>arcs le long des
+    colonnes = récurrence intra-flux</b> (GRU W<sub>hh</sub> + retour W<sub>fb</sub>) :
+    chaque neurone relit <b>tous</b> les neurones de son flux — pas de self-loop unitaire</div>
+  <div class="k"><span class="ln"></span><b>épaisseur du lien = gaine de myéline M · (1−φ)</b> :
+    usage répété → myélinisation (le lien s'épaissit) ; fatigue → le lien <b>fond</b> ;
+    repos → la récupération γ le ré-épaissit</div>
+  <div class="k">✦ <b>impulsions = information</b> en transit (vitesse ∝ myéline) —
+    <span style="color:#58f0a0">vert clair</span> = h<sub>Λ</sub> <i>frais</i> vers Ψ
+    (Λ mis à jour en premier)</div>
+  <div class="k">🖱 glisser = orbite · molette = zoom · survoler une boule = détails
+    · Espace = pause</div>
+</div>
+
+<div id="controls" class="panel">
+  <div class="btns">
+    <button id="btnPlay" class="primary">⏸ Pause</button>
+    <button id="btnStep">⏭ Pas +1</button>
+    <button id="btnReset">↺ Reset</button>
+  </div>
+  <div class="sl"><label>vitesse</label>
+    <input type="range" id="slSpeed" min="0.25" max="3" step="0.05" value="1">
+    <b id="vSpeed">1.00×</b></div>
+  <div class="sl"><label>fatigue → épaisseur</label>
+    <input type="range" id="slFat" min="0" max="1" step="0.05" value="1">
+    <b id="vFat">100%</b></div>
+  <div class="sl" style="margin-top:2px"><label>auto-orbite</label>
+    <input type="checkbox" id="cbOrbit" checked></div>
+  <div class="hint">« Fatigue → épaisseur » à 0 % : liens toujours épais (ablation
+    no-fatigue). À 100 % : la dépression synaptique fait fondre les liens des neurones
+    actifs — rotation de charge visible en continu.</div>
+</div>
+
+<div id="tip"></div>
+<div id="fallback"><div style="font-size:20px;color:#ff9b2f">WebGL indisponible</div>
+  <div>Impossible d'initialiser le rendu 3D dans ce navigateur.</div></div>
+
+<script src="vendor/three.min.js"></script>
+<script>
+"use strict";
+/* =====================================================================
+   MyelinFatigueNet — visualisation 3D interactive (mfn_viz/)
+   Le réseau simulé implémente EXACTEMENT les équations de mfn.py :
+     h~ = h·(1−φ)
+     α_Λ = σ(MLP_Λ(e))                  α_Ψ = σ(MLP_Ψ(e))^0.2   (flux lent)
+     g_Ψ→Λ = σ(Wg1 [h~Ψ ; h~Λ])         g_Λ→Ψ = σ(Wg2 [h~Λ ; h~Ψ])
+     fb_Λ = W_fb,Λ h~Λ ⊙ α_Λ ⊙ g_Ψ→Λ    fb_Ψ = W_fb,Ψ h~Ψ ⊙ α_Ψ ⊙ g_Λ→Ψ
+     h_Λ = GRU_Λ(xp + fb_Λ + W_Ψ→Λ h~Ψ)          [Λ d'abord]
+     h_Ψ = GRU_Ψ(xp + fb_Ψ + W_Λ→Ψ h~*_Λ)        [h~*_Λ = h_Λ·(1−φ_Λ) frais]
+     φ = γ⊙φ + (1−γ)⊙|h|   (post-GRU, agit au pas suivant)
+     y  = W_ro [h~_Λ ; h~_Ψ]                      (readout sur états fatigués)
+   Équivalence visuelle :
+     boule  = neurone     rayon/éclat ∝ |h~|
+     anneau = fatigue φ   (rouge) et décroissance α (gris)
+     lien   = synapse     épaisseur = myéline M·(1−φ)  → épais ⇄ fin
+     point  = impulsion   information en transit (vitesse ∝ M)
+   ===================================================================== */
+
+const H = 6, D = 5, O = 5, BETA = 0.2;   // H = 6/64 montrés par flux · D = 5/10 · O = 5/10
+const sig = z => 1 / (1 + Math.exp(-z));
+const clamp = (x, a, b) => x < a ? a : (x > b ? b : x);
+
+/* ---------------------------- RNG seedé ---------------------------- */
+function mulberry32(a) {
+  return function () {
+    a |= 0; a = a + 0x6D2B79F5 | 0;
+    let t = Math.imul(a ^ a >>> 15, 1 | a);
+    t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+    return ((t ^ t >>> 14) >>> 0) / 4294967296;
+  };
+}
+
+/* ---------------------------- modèle MFN (mfn.py) ---------------------------- */
+class MFN {
+  constructor(seed) {
+    const rng = mulberry32(seed);
+    const M = (r, c, s) => {          // matrice r×c ~ U(−s,+s)
+      const m = new Float64Array(r * c);
+      for (let i = 0; i < m.length; i++) m[i] = (rng() * 2 - 1) * s;
+      return m;
+    };
+    const V = n => new Float64Array(n);
+    this.D = D; this.O = O;
+    // projection d'entrée partagée
+    this.W_in = M(H, D, 0.9); this.b_in = V(H);
+    // MLP de décroissance indépendants (d → H → H)
+    this.dW1a = M(H, D, 0.8); this.db1a = M(H, 1, 0.3); this.dW2a = M(H, H, 0.35); this.db2a = V(H);
+    this.dW1p = M(H, D, 0.8); this.db1p = M(H, 1, 0.3); this.dW2p = M(H, H, 0.35); this.db2p = V(H);
+    // projections inter-flux (sans biais)
+    this.W_psi2lam = M(H, H, 0.7);
+    this.W_lam2psi = M(H, H, 0.7);
+    // portes de confiance (H × 2H, ordre des arguments inversé)
+    this.Wg1 = M(H, 2 * H, 0.6); this.bg1 = V(H);   // gate_psi2lam
+    this.Wg2 = M(H, 2 * H, 0.6); this.bg2 = V(H);   // gate_lam2psi
+    // retours intra-flux
+    this.Wfb1 = M(H, H, 0.5); this.Wfb2 = M(H, H, 0.5);
+    // cellules GRU (convention nn.GRUCell : biais ih + hh par porte)
+    const gs = 1.1 / Math.sqrt(H);
+    const cell = () => ({
+      Wiz: M(H, H, gs), Wih: M(H, H, gs), Wir: M(H, H, gs), Wihr: M(H, H, gs),
+      Win: M(H, H, gs), Wihn: M(H, H, gs), bz: V(H), br: V(H), bn: V(H)
+    });
+    this.gru1 = cell(); this.gru2 = cell();
+    // taux de récupération par neurone (logits, σ au runtime)
+    this.wg_lam = V(H); this.wg_psi = V(H);
+    for (let i = 0; i < H; i++) { this.wg_lam[i] = (rng() * 2 - 1) * 1.6; this.wg_psi[i] = (rng() * 2 - 1) * 1.6; }
+    // readout
+    this.W_ro = M(O, 2 * H, 0.5); this.b_ro = V(O);
+    this.reset();
+  }
+  reset() {
+    this.h_lam = new Float64Array(H); this.h_psi = new Float64Array(H);
+    this.phi_lam = new Float64Array(H); this.phi_psi = new Float64Array(H);
+    this.t = 0; this.tok = 0;
+    this.last = null;
+  }
+  /* GRUCell : h' = (1−z)⊙n + z⊙h */
+  gru(cell, x, h) {
+    const nH = H;
+    const z = new Float64Array(nH), r = new Float64Array(nH);
+    for (let i = 0; i < nH; i++) {
+      let az = 0, ar = 0;
+      for (let j = 0; j < nH; j++) {
+        az += cell.Wiz[i * nH + j] * x[j] + cell.Wih[i * nH + j] * h[j];
+        ar += cell.Wir[i * nH + j] * x[j] + cell.Wihr[i * nH + j] * h[j];
+      }
+      z[i] = sig(az); r[i] = sig(ar);
+    }
+    const ho = new Float64Array(nH);
+    for (let i = 0; i < nH; i++) {
+      let an = 0;
+      for (let j = 0; j < nH; j++) an += cell.Win[i * nH + j] * x[j] + cell.Wihn[i * nH + j] * (r[j] * h[j]);
+      ho[i] = (1 - z[i]) * Math.tanh(an) + z[i] * h[i];
+      ho[i] = clamp(ho[i], -3, 3);
+    }
+    return ho;
+  }
+  /* un pas : ordre exact de mfn.py */
+  step(e) {
+    const gL = new Float64Array(H), gP = new Float64Array(H);
+    for (let i = 0; i < H; i++) { gL[i] = sig(this.wg_lam[i]); gP[i] = sig(this.wg_psi[i]); }
+    // états effectifs (fatigue PRÉCÉDENTE)
+    const hLe = new Float64Array(H), hPe = new Float64Array(H);
+    for (let i = 0; i < H; i++) {
+      hLe[i] = this.h_lam[i] * Math.max(0, 1 - this.phi_lam[i]);
+      hPe[i] = this.h_psi[i] * Math.max(0, 1 - this.phi_psi[i]);
+    }
+    // projection d'entrée
+    const xp = new Float64Array(H);
+    for (let i = 0; i < H; i++) {
+      let s = this.b_in[i];
+      for (let k = 0; k < D; k++) s += this.W_in[i * D + k] * e[k];
+      xp[i] = s;
+    }
+    // décroissance adaptative : α_Λ = σ(MLP_Λ), α_Ψ = σ(MLP_Ψ)^0.2 (plus lent)
+    const aL = new Float64Array(H), aP = new Float64Array(H);
+    const h1a = new Float64Array(H), h1p = new Float64Array(H);
+    for (let i = 0; i < H; i++) {
+      let u = this.db1a[i]; for (let k = 0; k < D; k++) u += this.dW1a[i * D + k] * e[k];
+      h1a[i] = u > 0 ? u : 0;
+      u = this.db1p[i]; for (let k = 0; k < D; k++) u += this.dW1p[i * D + k] * e[k];
+      h1p[i] = u > 0 ? u : 0;
+      let v = this.db2a[i]; for (let j = 0; j < H; j++) v += this.dW2a[i * H + j] * h1a[j];
+      aL[i] = sig(v);
+      v = this.db2p[i]; for (let j = 0; j < H; j++) v += this.dW2p[i * H + j] * h1p[j];
+      aP[i] = Math.pow(Math.max(sig(v), 1e-6), BETA);
+    }
+    // portes de confiance (ordre des arguments inversé, cf. mfn.py)
+    const gP2L = new Float64Array(H), gL2P = new Float64Array(H);
+    for (let i = 0; i < H; i++) {
+      let s1 = this.bg1[i], s2 = this.bg2[i];
+      for (let j = 0; j < H; j++) {
+        s1 += this.Wg1[i * 2 * H + j] * hPe[j] + this.Wg1[i * 2 * H + H + j] * hLe[j];
+        s2 += this.Wg2[i * 2 * H + j] * hLe[j] + this.Wg2[i * 2 * H + H + j] * hPe[j];
+      }
+      gP2L[i] = sig(s1); gL2P[i] = sig(s2);
+    }
+    // retours intra-flux gatés par l'AUTRE flux
+    const fb1 = new Float64Array(H), fb2 = new Float64Array(H);
+    for (let i = 0; i < H; i++) {
+      let s1 = 0, s2 = 0;
+      for (let j = 0; j < H; j++) { s1 += this.Wfb1[i * H + j] * hPe[j]; s2 += this.Wfb2[i * H + j] * hLe[j]; }
+      fb1[i] = s1 * aL[i] * gP2L[i];
+      fb2[i] = s2 * aP[i] * gL2P[i];
+    }
+    // Λ d'abord
+    const mix1 = new Float64Array(H);
+    for (let i = 0; i < H; i++) {
+      let s = xp[i] + fb1[i];
+      for (let j = 0; j < H; j++) s += this.W_psi2lam[i * H + j] * hPe[j];
+      mix1[i] = s;
+    }
+    const hLam = this.gru(this.gru1, mix1, this.h_lam);
+    // h~*_Λ frais avec fatigue PRÉCÉDENTE (§3.7)
+    const hLes = new Float64Array(H);
+    for (let i = 0; i < H; i++) hLes[i] = hLam[i] * Math.max(0, 1 - this.phi_lam[i]);
+    // puis Ψ lit h~*_Λ frais
+    const mix2 = new Float64Array(H);
+    for (let i = 0; i < H; i++) {
+      let s = xp[i] + fb2[i];
+      for (let j = 0; j < H; j++) s += this.W_lam2psi[i * H + j] * hLes[j];
+      mix2[i] = s;
+    }
+    const hPsi = this.gru(this.gru2, mix2, this.h_psi);
+    // fatigue φ = γ⊙φ + (1−γ)⊙|h|  (post-GRU, agit au pas suivant)
+    for (let i = 0; i < H; i++) {
+      this.phi_lam[i] = clamp(gL[i] * this.phi_lam[i] + (1 - gL[i]) * Math.abs(hLam[i]), 0, 1);
+      this.phi_psi[i] = clamp(gP[i] * this.phi_psi[i] + (1 - gP[i]) * Math.abs(hPsi[i]), 0, 1);
+    }
+    // états effectifs finaux + readout (UNIQUEMENT h̃)
+    const hLo = new Float64Array(H), hPo = new Float64Array(H);
+    for (let i = 0; i < H; i++) {
+      hLo[i] = hLam[i] * Math.max(0, 1 - this.phi_lam[i]);
+      hPo[i] = hPsi[i] * Math.max(0, 1 - this.phi_psi[i]);
+    }
+    const y = new Float64Array(O);
+    for (let i = 0; i < O; i++) {
+      let s = this.b_ro[i];
+      for (let j = 0; j < H; j++) s += this.W_ro[i * 2 * H + j] * hLo[j] + this.W_ro[i * 2 * H + H + j] * hPo[j];
+      y[i] = s;
+    }
+    this.h_lam = hLam; this.h_psi = hPsi;
+    this.t++;
+    this.last = { alphaL: aL, alphaP: aP, gP2L: gP2L, gL2P: gL2P, hLe: hLe, hPe: hPe,
+      hLo: hLo, hPo: hPo, hLes: hLes, y: y, gL: gL, gP: gP };
+    return this.last;
+  }
+}
+
+/* ------------------------------ flux de tokens ------------------------------ */
+const TOKENS = ("La myéline épaissit les axones souvent sollicités ; la fatigue synaptique "
+  + "amincit les liens et ralentit les impulsions. Λ exprime vite le détail, Ψ intègre "
+  + "lentement le contexte, et les portes g laissent parler le flux le plus confiant. "
+  + "Puis γ, la récupération, redonne épaisseur et vitesse aux synapses fatiguées, et le "
+  + "cycle recommence.").split(" ");
+
+const rngTok = mulberry32(7);
+function inputFor(t) {
+  // rafales : 5 pas d'activation soutenue / 8 pas calmes → fatigue puis récupération
+  const strong = (t % 13) < 5;
+  const e = new Float64Array(D);
+  if (strong) {
+    for (let i = 0; i < D; i++) e[i] = 0.7 + 0.5 * rngTok();
+  } else {
+    for (let i = 0; i < D; i++) e[i] = 0.22 + 0.55 * rngTok();
+    const hot = Math.floor(rngTok() * D);
+    e[hot] = Math.min(1.5, e[hot] + 0.55);
+  }
+  return { e, strong };
+}
+
+/* ------------------------------ graphe 3D ------------------------------ */
+const X = { input: -7, lam: -2, psi: 2, out: 7 };
+const COL = {
+  input: 0x4f8cff, lam: 0xff9b2f, psi: 0x3fd66f, out: 0xb07af0,
+  eIn: [0.19, 0.36, 0.77], eSelfL: [0.81, 0.48, 0.10], eSelfP: [0.18, 0.62, 0.32],
+  eL2P: [0.27, 0.88, 0.54], eP2L: [0.88, 0.55, 0.17], eOut: [0.55, 0.37, 0.79]
+};
+
+function posOf(kind, i) {
+  const rng = mulberry32(100 + i * 7 + (kind === "input" ? 1 : kind === "lam" ? 2 : kind === "psi" ? 3 : 4));
+  // chaque couche est une FEUILLE 2D dans le plan YZ (rangées en hauteur,
+  // profondeur en z) — les liaisons rayonnent dans le volume, en vraie 3D
+  const ry = [1.15, 0, -1.15], rz = [-0.75, 0.75];
+  let r = i >> 1, c = i & 1;
+  const n = kind === "input" ? D : kind === "out" ? O : H;
+  if (n === 5) { if (i === 2) { r = 1; c = 1; } else if (i === 3) { r = 2; c = 0; } }
+  const y = ry[r] + (rng() - 0.5) * 0.18;
+  const z = rz[c] + (rng() - 0.5) * 0.25;
+  return new THREE.Vector3(X[kind], y, z);
+}
+const BALL_R = 0.38;   // rayon de base des boules (6 par colonne, espacement ~1.04)
+
+let renderer, scene, camera, glowTex;
+const nodes = [];   // {kind, idx, pos, mesh, glow, gauge, flash, alpha, e}
+const edges = [];   // {from, to, kind, pts, off, segs, M, sigN, srcPhi, acc, col}
+let edgeMesh, pulsePoints, pulseGhostPts;
+const waves = [];
+let nNodes = 0;
+
+function makeGlowTexture(size) {
+  const c = document.createElement("canvas"); c.width = c.height = size;
+  const g = c.getContext("2d");
+  const grd = g.createRadialGradient(size / 2, size / 2, 0, size / 2, size / 2, size / 2);
+  grd.addColorStop(0, "rgba(255,255,255,1)");
+  grd.addColorStop(0.25, "rgba(255,255,255,.85)");
+  grd.addColorStop(0.6, "rgba(255,255,255,.22)");
+  grd.addColorStop(1, "rgba(255,255,255,0)");
+  g.fillStyle = grd; g.fillRect(0, 0, size, size);
+  return new THREE.CanvasTexture(c);
+}
+
+function initScene() {
+  try {
+    renderer = new THREE.WebGLRenderer({ canvas: document.getElementById("scene"), antialias: true });
+  } catch (e) {
+    document.getElementById("fallback").style.display = "flex";
+    return false;
+  }
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.0;
+  scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x05070f);
+  scene.fog = new THREE.FogExp2(0x05070f, 0.005);
+  camera = new THREE.PerspectiveCamera(45, innerWidth / innerHeight, 0.1, 300);
+  camera.position.set(11, 6.5, 15);
+
+  scene.add(new THREE.AmbientLight(0x99a8c8, 0.55));
+  const d1 = new THREE.DirectionalLight(0xffffff, 0.95); d1.position.set(5, 9, 7); scene.add(d1);
+  // disque-sol sombre : repère spatial de profondeur (sans glow)
+  const disc = new THREE.Mesh(new THREE.CircleGeometry(16, 48),
+    new THREE.MeshBasicMaterial({ color: 0x0a101d, transparent: true, opacity: 0.85 }));
+  disc.rotation.x = -Math.PI / 2; disc.position.y = -2.9; scene.add(disc);
+
+  glowTex = makeGlowTexture(64);
+  glowTex.needsUpdate = true;
+
+  /* ---- étoiles de fond ---- */
+  {
+    const N = 380, pos = new Float32Array(N * 3);
+    const rng = mulberry32(42);
+    for (let i = 0; i < N; i++) {
+      const r = 45 + rng() * 60, th = rng() * 2 * Math.PI, ph = Math.acos(2 * rng() - 1);
+      pos[i * 3] = r * Math.sin(ph) * Math.cos(th);
+      pos[i * 3 + 1] = r * Math.cos(ph) * 0.6;
+      pos[i * 3 + 2] = r * Math.sin(ph) * Math.sin(th);
+    }
+    const g = new THREE.BufferGeometry();
+    g.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+    scene.add(new THREE.Points(g, new THREE.PointsMaterial({ color: 0x7790c8, size: 0.35,
+      map: glowTex, transparent: true, opacity: 0.35, blending: THREE.AdditiveBlending,
+      depthWrite: false, sizeAttenuation: true })));
+  }
+
+  /* ---- boules = neurones ---- */
+  const matCol = { input: COL.input, lam: COL.lam, psi: COL.psi, out: COL.out };
+  const kinds = ["input", "lam", "psi", "out"];
+  for (const kind of kinds) {
+    const cnt = kind === "input" ? D : kind === "out" ? O : H;
+    for (let i = 0; i < cnt; i++) {
+      const p = posOf(kind, i);
+      nNodes++;
+      const mesh = new THREE.Mesh(
+        new THREE.SphereGeometry(BALL_R, 32, 24),
+        new THREE.MeshStandardMaterial({ color: matCol[kind], emissive: matCol[kind],
+          emissiveIntensity: 0.6, roughness: 0.35, metalness: 0 }));
+      mesh.position.copy(p); scene.add(mesh);
+      const glow = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, color: matCol[kind],
+        blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity: 0.55 }));
+      glow.position.copy(p); glow.scale.setScalar(1.9); scene.add(glow);
+      // jauge φ : 41 arcs torus pré-construits (k/40 de tour) — UN mesh dont on
+      // échange la géométrie selon φ (1 draw call par neurone au lieu de 41)
+      const gaugeGeos = [];
+      let gauge = null;
+      if (kind === "lam" || kind === "psi") {
+        for (let k = 0; k <= 40; k++) {
+          gaugeGeos.push(new THREE.TorusGeometry(BALL_R * 1.42, 0.030, 6, 40, Math.max(0.02, (k / 40) * Math.PI * 2)));
+        }
+        gauge = new THREE.Mesh(gaugeGeos[0],
+          new THREE.MeshBasicMaterial({ color: 0xff4a4a, transparent: true, opacity: 0.85,
+            depthWrite: false, toneMapped: false }));
+        gauge.visible = false; scene.add(gauge);
+      }
+      nodes.push({ kind, idx: i, pos: p, mesh, glow, gauge, gaugeGeos,
+        col: new THREE.Color(matCol[kind]), flash: 0, alpha: 0.5, e: 0 });
+    }
+  }
+
+  /* ---- étiquettes de colonnes (dimensions réelles du modèle) ---- */
+  const labels = [
+    { kind: "input", top: "entrée eₜ · d = 10", sub: "5 composantes montrées", color: "#8db6ff" },
+    { kind: "lam", top: "flux Λ expressif · H = 64", sub: "6 neurones montrés · GRU", color: "#ffb45c" },
+    { kind: "psi", top: "flux Ψ conceptuel · H = 64", sub: "6 neurones montrés · GRU", color: "#7de89b" },
+    { kind: "out", top: "sortie y · d_out = 10", sub: "5 composantes montrées", color: "#d9b7ff" }
+  ];
+  for (const lb of labels) {
+    const c = document.createElement("canvas"); c.width = 640; c.height = 150;
+    const g = c.getContext("2d");
+    g.textAlign = "center"; g.textBaseline = "middle";
+    g.font = "700 40px system-ui, sans-serif";
+    g.fillStyle = lb.color; g.fillText(lb.top, 320, 48);
+    g.font = "400 28px system-ui, sans-serif";
+    g.fillStyle = "rgba(190,205,232,0.85)"; g.fillText(lb.sub, 320, 110);
+    const tex = new THREE.CanvasTexture(c);
+    const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true,
+      depthWrite: false, depthTest: false, opacity: 0.95 }));
+    sp.scale.set(3.4, 0.80, 1);
+    sp.position.set(X[lb.kind], 2.85, 0);
+    scene.add(sp);
+  }
+
+  /* ---- liens = synapses : InstancedMesh de cylindres ---- */
+  const SEG = 9;
+  let count = 0;
+  const N = (k, i) => nodes.find(nn => nn.kind === k && nn.idx === i);
+  const addEdge = (from, to, kind) => {
+    const A = from.pos, B = to.pos, pts = [];
+    const rng = mulberry32(3000 + edges.length * 23);
+    let col;
+    // échantillonnage d'une courbe quadratique A → C → B
+    const quad = C => {
+      for (let s = 0; s <= SEG; s++) {
+        const u = s / SEG, v = 1 - u;
+        pts.push(new THREE.Vector3(
+          v * v * A.x + 2 * v * u * C.x + u * u * B.x,
+          v * v * A.y + 2 * v * u * C.y + u * u * B.y,
+          v * v * A.z + 2 * v * u * C.z + u * u * B.z));
+      }
+    };
+    if (kind === "lam_lam" || kind === "psi_psi") {
+      // récurrence intra-flux DENSE (W_hh du GRU + retour W_fb) : la boucle QUITTE
+      // la feuille vers l'avant (z+) et y revient — loop visible, pas de plan
+      col = kind === "lam_lam" ? COL.eSelfL : COL.eSelfP;
+      const outDir = kind === "lam_lam" ? 1 : -1;   // vers le centre (x+ pour Λ)
+      const bow = 0.90 + 0.55 * rng();
+      quad(new THREE.Vector3((A.x + B.x) / 2 + outDir * 0.30,
+        (A.y + B.y) / 2 + (rng() - 0.5) * 0.5,
+        (A.z + B.z) / 2 + bow));
+    } else if (kind === "lam2psi" || kind === "psi2lam") {
+      // arcs inter-flux (W_Λ→Ψ / W_Ψ→Λ) : légère montée/descente dans le volume
+      col = kind === "lam2psi" ? COL.eL2P : COL.eP2L;
+      const sgn = kind === "lam2psi" ? 1 : -1;
+      quad(new THREE.Vector3((A.x + B.x) / 2, (A.y + B.y) / 2 + sgn * (0.35 + 0.45 * rng()),
+        (A.z + B.z) / 2 + (rng() - 0.5) * 0.5));
+    } else {
+      // projections entre feuilles (entrée → flux, flux → sortie) : rayons 3D,
+      // léger éventail pour ne jamais superposer deux fibres
+      col = (kind === "in_lam" || kind === "in_psi") ? COL.eIn : COL.eOut;
+      quad(new THREE.Vector3((A.x + B.x) / 2 + (rng() - 0.5) * 0.3,
+        (A.y + B.y) / 2 + (rng() - 0.5) * 0.35,
+        (A.z + B.z) / 2 + (rng() - 0.5) * 0.35));
+    }
+    edges.push({ from, to, kind, pts, off: count, segs: SEG,
+      M: 0.3 + 0.4 * rng(), sigN: 0, srcPhi: 0, acc: 0, col });
+    count += SEG;
+  };
+  // entrée d=10 → les deux flux (projection partagée W_in)
+  for (let j = 0; j < H; j++) for (let i = 0; i < D; i++) {
+    addEdge(N("input", i), N("lam", j), "in_lam");
+    addEdge(N("input", i), N("psi", j), "in_psi");
+  }
+  // récurrences intra-flux + croisements bidirectionnels (denses H×H)
+  for (let j = 0; j < H; j++) for (let i = 0; i < H; i++) {
+    addEdge(N("lam", i), N("lam", j), "lam_lam");
+    addEdge(N("psi", i), N("psi", j), "psi_psi");
+    addEdge(N("lam", i), N("psi", j), "lam2psi");
+    addEdge(N("psi", i), N("lam", j), "psi2lam");
+  }
+  // readout [h̃Λ ; h̃Ψ] → d_out
+  for (let j = 0; j < O; j++) for (let i = 0; i < H; i++) {
+    addEdge(N("lam", i), N("out", j), "lam_y");
+    addEdge(N("psi", i), N("out", j), "psi_y");
+  }
+  const cyl = new THREE.CylinderGeometry(1, 1, 1, 6, 1, true);
+  edgeMesh = new THREE.InstancedMesh(cyl,
+    new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true,
+      depthWrite: false, toneMapped: false }), count);
+  edgeMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+  edgeMesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(count * 3), 3);
+  edgeMesh.instanceColor.setUsage(THREE.DynamicDrawUsage);
+  edgeMesh.frustumCulled = false;
+  scene.add(edgeMesh);
+
+  /* ---- impulsions : Points (atténuation de taille) ---- */
+  const mkPoints = (n, size) => {
+    const g = new THREE.BufferGeometry();
+    const pos = new Float32Array(n * 3); pos.fill(-999);
+    const col = new Float32Array(n * 3);
+    g.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+    g.setAttribute("color", new THREE.BufferAttribute(col, 3));
+    const p = new THREE.Points(g, new THREE.PointsMaterial({ size, map: glowTex, vertexColors: true,
+      blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, sizeAttenuation: true }));
+    p.frustumCulled = false;
+    scene.add(p);
+    return { p, pos, col, n };
+  };
+  pulsePoints = mkPoints(150, 0.20);
+  pulseGhostPts = mkPoints(300, 0.08);
+
+  /* ---- ondes de burst (entrée) ---- */
+  for (let k = 0; k < 3; k++) {
+    const w = new THREE.Mesh(new THREE.RingGeometry(0.9, 1.0, 64),
+      new THREE.MeshBasicMaterial({ color: 0x4f8cff, transparent: true, opacity: 0,
+        blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false, side: THREE.DoubleSide }));
+    w.visible = false; scene.add(w); waves.push({ mesh: w, t: 1 });
+  }
+  resize();
+  return true;
+}
+
+/* ------------------------------ caméra orbitale ------------------------------ */
+const cam = { yaw: 0.62, pitch: 0.40, dist: 15.5, target: new THREE.Vector3(0, 0.05, 0),
+  vYaw: 0, vPitch: 0, lastInteract: 0 };
+function applyCam() {
+  cam.pitch = clamp(cam.pitch, -1.35, 1.35);
+  cam.dist = clamp(cam.dist, 9, 40);
+  camera.position.set(
+    cam.target.x + cam.dist * Math.cos(cam.pitch) * Math.sin(cam.yaw),
+    cam.target.y + cam.dist * Math.sin(cam.pitch),
+    cam.target.z + cam.dist * Math.cos(cam.pitch) * Math.cos(cam.yaw));
+  camera.lookAt(cam.target);
+}
+
+/* ------------------------------ simulation ------------------------------ */
+const model = new MFN(1234);
+const pulses = [];   // {edge, s, v, I}
+const MAX_PULSES = 150;
+let playing = true, stepAcc = 0, simTime = 0;
+let speed = 1, fatEff = 1;
+let curE = new Float64Array(D), curStrong = false, lastIn = null;
+const NODE = (kind, idx) => nodes.find(n => n.kind === kind && n.idx === idx);
+
+function doStep() {
+  const { e, strong } = inputFor(model.tok);
+  curE = e; curStrong = strong;
+  const out = model.step(e);
+  model.tok++;
+  for (let i = 0; i < D; i++) NODE("input", i).e = e[i];
+  for (let i = 0; i < H; i++) {
+    NODE("lam", i).alpha = out.alphaL[i];
+    NODE("psi", i).alpha = out.alphaP[i];
+  }
+  // signaux par synapse : |poids| × activation effective (fatiguée)
+  for (const ed of edges) {
+    let sg = 0, srcPhi = 0;
+    const i = ed.from.idx, j = ed.to.idx;
+    switch (ed.kind) {
+      case "in_lam": sg = Math.abs(model.W_in[j * D + i]) * e[i]; srcPhi = model.phi_lam[j]; break;
+      case "in_psi": sg = Math.abs(model.W_in[j * D + i]) * e[i]; srcPhi = model.phi_psi[j]; break;
+      case "lam2psi": sg = Math.abs(model.W_lam2psi[j * H + i]) * Math.abs(out.hLes[i]); srcPhi = model.phi_lam[i]; break;
+      case "psi2lam": sg = Math.abs(model.W_psi2lam[j * H + i]) * Math.abs(out.hPe[i]); srcPhi = model.phi_psi[i]; break;
+      case "lam_y": sg = Math.abs(model.W_ro[j * 2 * H + i]) * Math.abs(out.hLo[i]); srcPhi = model.phi_lam[i]; break;
+      case "psi_y": sg = Math.abs(model.W_ro[j * 2 * H + H + i]) * Math.abs(out.hPo[i]); srcPhi = model.phi_psi[i]; break;
+      case "lam_lam":
+        // récurrence intra-flux : retour W_fb (gaté par α·g_Ψ→Λ) + W_hh du GRU
+        sg = Math.abs(out.hLe[i]) * (0.6 * Math.abs(model.Wfb1[j * H + i]) * out.alphaL[i] * out.gP2L[i]
+          + 0.5 * Math.abs(model.gru1.Wihn[j * H + i]));
+        srcPhi = model.phi_lam[i]; break;
+      case "psi_psi":
+        sg = Math.abs(out.hPe[i]) * (0.6 * Math.abs(model.Wfb2[j * H + i]) * out.alphaP[i] * out.gL2P[i]
+          + 0.5 * Math.abs(model.gru2.Wihn[j * H + i]));
+        srcPhi = model.phi_psi[i]; break;
+    }
+    ed.sigN = clamp(sg / 0.22, 0, 1.15);
+    ed.srcPhi = srcPhi;
+    // myélinisation : usage → épaisseur ; inactivité → démyélinisation
+    // (coefficients choisis pour une variation NETTE entre liens actifs et inactifs)
+    const tr = ed.sigN;
+    ed.M = clamp(ed.M + 0.16 * tr * (1 - ed.M) - 0.14 * ed.M * (1 - tr), 0.05, 1);
+  }
+  lastIn = out;
+  if (strong) for (const w of waves) if (w.t >= 1) { w.t = 0; w.mesh.visible = true; break; }
+}
+
+function spawnPulses(dt) {
+  for (const ed of edges) {
+    ed.acc += dt * 5.5 * ed.sigN * (1 - 0.45 * ed.srcPhi);
+    while (ed.acc >= 1) {
+      ed.acc -= 1;
+      if (pulses.length >= MAX_PULSES) break;
+      pulses.push({ edge: ed, s: 0, v: (0.9 + 2.6 * ed.M) * speed, I: 0.30 + 0.45 * Math.random() });
+    }
+  }
+}
+
+function updatePulses(dt) {
+  for (let i = pulses.length - 1; i >= 0; i--) {
+    const pu = pulses[i];
+    pu.s += pu.v * dt;
+    if (pu.s >= 1) {
+      pulses.splice(i, 1);
+      pu.edge.to.flash = Math.min(1.5, pu.edge.to.flash + pu.I);   // flash d'arrivée
+    }
+  }
+  const pp = pulsePoints, gp = pulseGhostPts;
+  let pi = 0, gi = 0;
+  const setPt = (arr, idx, edge, s) => {
+    if (s < 0) { arr.pos[idx * 3] = -999; return; }
+    const N = edge.pts.length - 1;
+    const f = s * N, i0 = Math.floor(f), i1 = Math.min(N, i0 + 1), fr = f - i0;
+    const a = edge.pts[i0], b2 = edge.pts[i1];
+    arr.pos[idx * 3] = a.x + (b2.x - a.x) * fr;
+    arr.pos[idx * 3 + 1] = a.y + (b2.y - a.y) * fr;
+    arr.pos[idx * 3 + 2] = a.z + (b2.z - a.z) * fr;
+  };
+  const setCol = (arr, idx, edge, mult) => {
+    const c = edge.col;
+    arr.col[idx * 3] = c[0] * mult; arr.col[idx * 3 + 1] = c[1] * mult; arr.col[idx * 3 + 2] = c[2] * mult;
+  };
+  for (const pu of pulses) {
+    if (pi < pp.n) { setPt(pp, pi, pu.edge, pu.s); setCol(pp, pi, pu.edge, pu.I); pi++; }
+    if (gi + 2 <= gp.n) {
+      setPt(gp, gi, pu.edge, pu.s - 0.05); setCol(gp, gi, pu.edge, pu.I * 0.35);
+      setPt(gp, gi + 1, pu.edge, pu.s - 0.10); setCol(gp, gi + 1, pu.edge, pu.I * 0.14);
+      gi += 2;
+    }
+  }
+  for (let i = pi; i < pp.n; i++) pp.pos[i * 3] = -999;
+  for (let i = gi; i < gp.n; i++) gp.pos[i * 3] = -999;
+  pp.p.geometry.attributes.position.needsUpdate = true;
+  pp.p.geometry.attributes.color.needsUpdate = true;
+  pp.p.geometry.setDrawRange(0, Math.max(1, pi));
+  gp.p.geometry.attributes.position.needsUpdate = true;
+  gp.p.geometry.attributes.color.needsUpdate = true;
+  gp.p.geometry.setDrawRange(0, Math.max(1, gi));
+}
+
+/* -------- rendu : épaisseur = myéline×(1−φ), boules ∝ |h̃| -------- */
+const dummy = new THREE.Object3D();
+const UP = new THREE.Vector3(0, 1, 0);
+const tmpV = new THREE.Vector3(), tmpQ = new THREE.Quaternion(), tmpC = new THREE.Color();
+const GREY = new THREE.Color(0x39404f);   // neurone inactif / fatigué (grisé)
+
+function updateEdges() {
+  for (const ed of edges) {
+    const w = 0.008 + 0.160 * ed.M * (1 - fatEff * 0.92 * ed.srcPhi);
+    const inten = clamp(0.34 + 0.66 * (w / 0.17), 0, 1);
+    tmpC.setRGB(ed.col[0] * inten, ed.col[1] * inten, ed.col[2] * inten);
+    for (let s = 0; s < ed.segs; s++) {
+      const a = ed.pts[s], b = ed.pts[s + 1];
+      tmpV.set(b.x - a.x, b.y - a.y, b.z - a.z);
+      const len = tmpV.length();
+      tmpQ.setFromUnitVectors(UP, tmpV.normalize());
+      dummy.position.set((a.x + b.x) / 2, (a.y + b.y) / 2, (a.z + b.z) / 2);
+      dummy.quaternion.copy(tmpQ);
+      dummy.scale.set(w, len * 1.06, w);
+      dummy.updateMatrix();
+      edgeMesh.setMatrixAt(ed.off + s, dummy.matrix);
+      edgeMesh.setColorAt(ed.off + s, tmpC);
+    }
+  }
+  edgeMesh.instanceMatrix.needsUpdate = true;
+  edgeMesh.instanceColor.needsUpdate = true;
+}
+
+function updateNeurons(dt, t) {
+  const out = lastIn;
+  for (const n of nodes) {
+    let act = 0;
+    if (out) {
+      if (n.kind === "input") act = clamp(n.e / 1.3, 0, 1);
+      else if (n.kind === "lam") act = clamp(Math.abs(out.hLo[n.idx]) / 1.1, 0, 1);
+      else if (n.kind === "psi") act = clamp(Math.abs(out.hPo[n.idx]) / 1.1, 0, 1);
+      else act = clamp(Math.abs(out.y[n.idx]) / 1.2, 0, 1);
+    }
+    // désaturation : actif = couleur du flux, inactif/fatigué = gris
+    const sat = 0.18 + 0.82 * act;
+    n.mesh.material.color.copy(GREY).lerp(n.col, sat);
+    n.mesh.material.emissive.copy(GREY).lerp(n.col, sat);
+    const bre = 0.015 * Math.sin(t * 2.2 + n.idx * 1.7);
+    n.mesh.scale.setScalar(0.72 + 0.46 * act + bre);
+    n.mesh.material.emissiveIntensity = 0.35 + 0.80 * act + n.flash * 0.5;
+    n.flash = Math.max(0, n.flash - dt * 3);
+    n.glow.material.color.copy(GREY).lerp(n.col, sat);
+    n.glow.scale.setScalar(clamp(0.9 + 1.0 * act, 0.1, 4));
+    n.glow.material.opacity = Math.min(0.45, 0.08 + 0.20 * act + n.flash * 0.12);
+    if (n.gauge) {
+      const phi = out ? (n.kind === "lam" ? model.phi_lam[n.idx] : model.phi_psi[n.idx]) : 0;
+      const kArc = Math.round(phi * 40);
+      n.gauge.visible = kArc > 0;
+      if (n.gauge.visible) {
+        n.gauge.geometry = n.gaugeGeos[kArc];
+        n.gauge.quaternion.copy(camera.quaternion);
+      }
+    }
+  }
+}
+
+function updateWaves(dt) {
+  for (const w of waves) {
+    if (!w.mesh.visible) continue;
+    w.t += dt * 1.1;
+    if (w.t >= 1) { w.mesh.visible = false; continue; }
+    w.mesh.quaternion.copy(camera.quaternion);
+    w.mesh.position.set(-7, 0, 0);
+    const s = 1 + w.t * 6;
+    w.mesh.scale.set(s, s, s);
+    w.mesh.material.opacity = 0.35 * (1 - w.t);
+  }
+}
+
+/* ------------------------------ survol ------------------------------ */
+const ray = new THREE.Raycaster();
+const mouse = new THREE.Vector2();
+const tip = document.getElementById("tip");
+const nameOf = { input: "entrée", lam: "Λ", psi: "Ψ", out: "sortie" };
+
+function onMove(ev) {
+  mouse.x = (ev.clientX / innerWidth) * 2 - 1;
+  mouse.y = -(ev.clientY / innerHeight) * 2 + 1;
+  ray.setFromCamera(mouse, camera);
+  const meshes = nodes.map(n => n.mesh);
+  const hits = ray.intersectObjects(meshes);
+  if (!hits.length) { tip.style.display = "none"; return; }
+  const n = nodes.find(nn => nn.mesh === hits[0].object);
+  const out = lastIn;
+  const colHex = "#" + n.mesh.material.color.getHexString();
+  let html = "<div class='hd'><span class='c' style='background:" + colHex + "'></span>"
+    + nameOf[n.kind] + "<sub>" + (n.idx + 1) + "</sub></div>";
+  if (!out) {
+    html += "initialisation : h = φ = 0";
+  } else if (n.kind === "lam") {
+    html += "h = " + model.h_lam[n.idx].toFixed(2) + " · h̃ = " + out.hLo[n.idx].toFixed(2)
+      + "<br>φ = " + model.phi_lam[n.idx].toFixed(2) + " · γ = " + out.gL[n.idx].toFixed(2)
+      + "<br>αΛ = " + out.alphaL[n.idx].toFixed(2) + " · gΨ→Λ = " + out.gP2L[n.idx].toFixed(2);
+  } else if (n.kind === "psi") {
+    html += "h = " + model.h_psi[n.idx].toFixed(2) + " · h̃ = " + out.hPo[n.idx].toFixed(2)
+      + "<br>φ = " + model.phi_psi[n.idx].toFixed(2) + " · γ = " + out.gP[n.idx].toFixed(2)
+      + "<br>αΨ = " + out.alphaP[n.idx].toFixed(3) + " (^0.2 lent) · gΛ→Ψ = " + out.gL2P[n.idx].toFixed(2);
+  } else if (n.kind === "input") {
+    html += "e" + (n.idx + 1) + " = " + (curE[n.idx] || 0).toFixed(2)
+      + "<br>→ projeté vers Λ et Ψ (W_in partagé)";
+  } else {
+    html += "y" + (n.idx + 1) + " = " + out.y[n.idx].toFixed(2)
+      + "<br>readout sur [h̃Λ ; h̃Ψ] uniquement";
+  }
+  tip.innerHTML = html;
+  tip.style.display = "block";
+  const r = tip.getBoundingClientRect();
+  tip.style.left = clamp(ev.clientX + 16, 8, innerWidth - r.width - 8) + "px";
+  tip.style.top = clamp(ev.clientY + 14, 8, innerHeight - r.height - 8) + "px";
+}
+
+/* ------------------------------ boucle ------------------------------ */
+function resize() {
+  const w = innerWidth, h = innerHeight;
+  renderer.setSize(w, h, false);
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+}
+
+let lastT = 0;
+function loop(ts) {
+  requestAnimationFrame(loop);
+  const dt = Math.min(0.05, (ts - lastT) / 1000 || 0.016);
+  lastT = ts;
+  simTime += dt;
+
+  // auto-orbite après 3.5 s sans interaction
+  if (document.getElementById("cbOrbit").checked && ts / 1000 - cam.lastInteract > 3.5) {
+    cam.yaw += dt * 0.10;
+  }
+  cam.yaw += cam.vYaw; cam.pitch += cam.vPitch;
+  cam.vYaw *= 0.92; cam.vPitch *= 0.92;
+  applyCam();
+
+  if (playing && !document.hidden) {
+    stepAcc += dt;
+    const stepInt = 0.85 / speed;
+    while (stepAcc >= stepInt) { stepAcc -= stepInt; doStep(); }
+    spawnPulses(dt);
+    updatePulses(dt);
+  }
+  updateEdges();
+  updateNeurons(dt, simTime);
+  updateWaves(dt);
+  renderer.render(scene, camera);
+}
+
+/* ------------------------------ UI ------------------------------ */
+const ui = id => document.getElementById(id);
+function bind() {
+  ui("btnPlay").onclick = () => {
+    playing = !playing;
+    ui("btnPlay").textContent = playing ? "⏸ Pause" : "▶ Jouer";
+  };
+  ui("btnStep").onclick = () => { doStep(); stepAcc = 0; };
+  ui("btnReset").onclick = () => {
+    model.reset(); model.tok = 0; pulses.length = 0; stepAcc = 0;
+    curStrong = false; curE = new Float64Array(D); lastIn = null;
+    for (const ed of edges) {
+      ed.M = 0.3 + 0.4 * ((ed.M * 7.3) % 1);
+      ed.sigN = 0; ed.acc = 0; ed.srcPhi = 0;
+    }
+    for (const n of nodes) { n.flash = 0; n.e = 0; n.alpha = 0.5; }
+  };
+  ui("slSpeed").addEventListener("input", e2 => {
+    speed = +e2.target.value; ui("vSpeed").textContent = speed.toFixed(2) + "×";
+  });
+  ui("slFat").addEventListener("input", e2 => {
+    fatEff = +e2.target.value; ui("vFat").textContent = Math.round(fatEff * 100) + "%";
+  });
+
+  let px = 0, py = 0, dragging = false;
+  const cvs = renderer.domElement;
+  cvs.addEventListener("pointerdown", e => {
+    dragging = true; px = e.clientX; py = e.clientY;
+    cvs.classList.add("dragging"); cam.vYaw = 0; cam.vPitch = 0;
+  });
+  addEventListener("pointermove", e => {
+    if (dragging) {
+      const dx = e.clientX - px, dy = e.clientY - py;
+      px = e.clientX; py = e.clientY;
+      cam.yaw -= dx * 0.005; cam.pitch += dy * 0.005;
+      cam.vYaw = -dx * 0.003; cam.vPitch = dy * 0.003;
+      cam.lastInteract = performance.now() / 1000;
+    } else onMove(e);
+  });
+  addEventListener("pointerup", () => { dragging = false; cvs.classList.remove("dragging"); });
+  addEventListener("wheel", e => {
+    cam.dist *= Math.exp(e.deltaY * 0.001);
+    cam.lastInteract = performance.now() / 1000;
+  }, { passive: true });
+  addEventListener("resize", resize);
+  addEventListener("keydown", e => {
+    if (e.code === "Space") { e.preventDefault(); ui("btnPlay").click(); }
+    if (e.code === "ArrowRight") doStep();
+  });
+}
+
+/* ------------------------------ stats ------------------------------ */
+let statAcc = 0;
+function updateStats(dt) {
+  statAcc += dt;
+  if (statAcc < 0.25) return;
+  statAcc = 0;
+  ui("stT").textContent = model.t;
+  ui("stTok").textContent = (curStrong ? "★ " : "") + TOKENS[model.tok % TOKENS.length];
+  let pl = 0, pp2 = 0, mm = 0;
+  for (let i = 0; i < H; i++) { pl += model.phi_lam[i]; pp2 += model.phi_psi[i]; }
+  for (const ed of edges) mm += ed.M;
+  pl /= H; pp2 /= H; mm /= edges.length;
+  ui("stPhiLv").textContent = pl.toFixed(2);
+  ui("stPhiPv").textContent = pp2.toFixed(2);
+  ui("stMyev").textContent = mm.toFixed(2);
+  ui("stPhiL").style.width = Math.round(pl * 100) + "%";
+  ui("stPhiP").style.width = Math.round(pp2 * 100) + "%";
+  ui("stMye").style.width = Math.round(mm * 100) + "%";
+  ui("stPul").textContent = pulses.length;
+}
+
+/* ------------------------------ démarrage ------------------------------ */
+window.addEventListener("DOMContentLoaded", () => {
+  if (!initScene()) return;
+  bind();
+  requestAnimationFrame(loop);
+  setInterval(() => updateStats(0.3), 250);
+});
+</script>
+</body>
+</html>

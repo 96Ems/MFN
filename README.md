@@ -380,6 +380,32 @@ Rempli automatiquement depuis `phase4/results.json` :
 
 ---
 
+## Visualisation interactive du modèle (3D, Three.js)
+
+`mfn_viz/mfn_animation.html` — auto-portante (Three.js vendu dans `mfn_viz/vendor/`),
+**aucun serveur ni internet requis** : double-cliquer le fichier suffit. Chaque couche est
+une **feuille 2D** (hauteur × profondeur) et les liaisons rayonnent dans le **volume 3D** ;
+la simulation implémente **exactement** les équations de `mfn.py` (GRUcells,
+α_Ψ = σ(MLP)^0.2, portes bidirectionnelles `g`, fatigue φ = γ⊙φ + (1−γ)⊙|h|, readout sur
+h̃) transposées en JavaScript avec des poids seedés — l'animation *est* le modèle, pas une
+caricature.
+
+| Élément visuel | Équivalent modèle |
+|---|---|
+| Boule = neurone (taille & éclat ∝ |h̃|, **grisé** si inactif/fatigué) | h̃ = h·(1−φ) |
+| Arc rouge autour de la boule | fatigue φ (le seul self-loop scalaire : φᵢ = γᵢφᵢ + (1−γᵢ)|hᵢ|) |
+| Épaisseur du lien = **myéline M · (1−φ)** | usage → myélinisation (épais) ; fatigue → le lien fond ; repos → récupération γ |
+| Impulsions lumineuses = information en transit (vitesse ∝ M) | signaux `\|W\|·\|h̃\|`, portes g modulent les flux croisés |
+| Boucles qui sortent des feuilles Λ et Ψ | récurrence **intra-flux dense** (W_hh du GRU + retour W_fb) — pas de self-loop unitaire |
+| Arcs vert clair (Λ→Ψ) / ambre (Ψ→Λ) | W_Λ→Ψ(h~*_Λ frais) / W_Ψ→Λ — Λ mis à jour en premier |
+| 5 / 6 / 6 / 5 neurones | d = 10 → H = 64 par flux (2×64) → d_out = 10 |
+
+Contrôles : ⏯ / pas manuel / reset, vitesse, curseur **« fatigue → épaisseur »** (0 %
+= ablation no-fatigue), auto-orbite, orbite/zoom à la souris, survol d'un neurone
+(détails h̃, φ, γ, α, g), Espace = pause.
+
+---
+
 ## Notes méthodologiques
 
 - **Ablations fidèles** : `no-gates`/`no-bidir` remplacent réellement les portes

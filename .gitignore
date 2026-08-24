@@ -19,3 +19,6 @@ phase4/data_subset_stories/
 
 # phase5 data (ultrachat slice, reproducible)
 phase5/data_sft/
+# gros corpus brut (reconstruible: build_bigdata_stream.py)
+phase4/data_big/
+phase4/data_big_stories/
