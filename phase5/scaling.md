@@ -14,6 +14,7 @@ externe ré-entraîné.
 | P2 | deep_3l [192,128,96] | 2 612 384 | 3 @ 5e-4 | 2.6582 | 14.27 | 0.9675 | ✅ test ppl 14.53 — invalide pour la pente (budget ≠ P0), info : bat 2l à iso-epoch |
 | P3 | deep_2l [192,96] | 2 122 368 | 4 @ 1e-3 | — | — | — | ⏳ lane suivante (post-SFT) |
 | P4 | deep_3l [192,128,96] | 2 612 384 | 4 @ 1e-3 | **2.4135** | **11.17** | **0.8785** | ✅ terminé 22/08 17h44 — TEST ppl **11.39**, bpc 0.8873. **Barre α_N falsifiée** : α_N = **−0.006** (total) / −0.004 (non-emb) vs barre 0.076 → 2.26 requis, obtenu 2.4135 (+0.15). Gains/ep décroissants ×0.5-0.6 (−0.23, −0.116, −0.072) ; asymptote estimée ≈ 2.30 > 2.26 même à epochs infinis sur ce corpus → signature **famine de données** (8.65 tok/param vs 19.6 pour le 1L), pas échec d'architecture. Le lr 1e-3 confirmé : chaque epoch bat le même epoch à 5e-4 (−0.22, −0.19, −0.17, −0.14) |
+| P5 | deep_2zf (2 zones asym. FAST, rate 2) | 1 814 000 | 2 @ 1e-3 | **2.5352** | **12.62** | **0.9228** | ✅ terminé 24/08 — même corpus (22.6M ; 2 epochs = 45.2M tok ≈ 25 tok/param, proche Chinchilla). TEST ppl **12.85** (bpc ~0.936). NOTABLE : moins de params que P1 (1.81M vs 2.12M), moitié moins de tokens vus (45M vs 90M), et val **meilleure** (2.5352 vs 2.6022) → la structure 2-zones asymétriques compresse mieux les stories qu'un empilement dense à iso-budget. Point d'ancrage famille Z ; la pente attendue viendra de z10→z30→z300 |
 
 ## Ancres locales (mêmes données, déjà entraînées — gratuites)
 
@@ -86,3 +87,50 @@ Depuis P0 (mfn 1L, 2.4013) avec la pente transformers α_N :
   noté : MFN 5.99k tok/s vs GRU 40.8k (lourd en calcul par token, à pondérer).
 - Conclusion prudente (courbure petite échelle) ; preuve définitive >100M
   params = cluster.
+
+---
+
+## SFT + chat — deep_2zf sur UltraChat (terminé le 24/08, ~15h37)
+
+**Protocole** : base = checkpoint P5 (deep_2zf, 1.8M). Données : slice UltraChat
+SFT (~29.4M tokens, masque sur réponses assistant = 22.9M loss-tokens),
+2 epochs @ 1e-4, B64/seq128, cosine par epoch (5.5e-5 en epoch 2), clip_grad 1.0.
+
+| Epoch | SFT loss (masqué) | Val loss | Ppl | Lecture |
+|---|---|---|---|---|
+| 1 | 4.0155 | 3.6783 | 39.58 | format « assistant ChatGPT » acquis (6.0 → 3.8) |
+| 2 | 3.5974 | **3.5289** | **34.09** | moule poli + variété d'ouvertures ; plancher de capacité atteint |
+
+⚠️ **Incomparable aux points P0-P5** : données (UltraChat vs TinyStories),
+masque (réponses vs continu) et target (dialogue vs story) différents. La val
+est passée de ~6.0 (base sur ce format) à 3.53 : le SFT a bien appris le format.
+
+**Self-test chat (greedy, 4 questions, résultats verbatim)** :
+- « Tell me a story about a cat. » / « What is the capital of France? » /
+  « Write a short poem about the sea. » / « Why is the sky blue? » →
+  **4 réponses sur le même moule** (« Certainly! Here are some examples of how
+  to create a sense of … » ; epoch 2 : variantes « The X is a great way to
+  … ») — **aucune distinction de sujet**.
+
+**Leçons documentées** :
+1. **Moule unique, pas de savoir** : ppl 34 = distribution énorme → greedy
+   tombe dans le tube le plus probable ; les faits ne peuvent pas exister à
+   1.8M params (capacité de stockage ~0.5-1 Mo d'info utile).
+2. **Catastrophic forgetting observé** : le base (P5) racontait des histoires
+   cohérentes (dialogue + morale, signature TinyStories) ; après SFT, la même
+   question produit le moule UltraChat. L'entropie du nouveau corpus a écrasé
+   la compétence stories — conforme au budget d'information du modèle.
+3. **Ce que l'epoch 2 a acheté** : ppl 39.6 → 34.1 et des ouvertures plus
+   variées (2/4 cas) — de la fluence, pas de la connaissance. Rendements
+   décroissants confirmés (Δval ep1→ep2 = −0.15 vs Δ ep0→ep1 ≈ −0.3-1).
+4. **Conclusion campagne 1.8M** : la chaîne complète (préentraînement → SFT →
+   chat → dashboard → git) fonctionne et est reproductible ; le saut qualitatif
+   nécessite la capacité (z30 72.7M sur Mac M1 / z300 301.5M sur 4090 louée,
+   configs dans `ARCHES`, données data_big/data_big2).
+
+### Configs Z en attente de campagne (prêtes)
+| Arch | Params (comptés) | Cible |
+|---|---|---|
+| z10 | 4.65 M | bench variantes |
+| z30 | 72.72 M | Mac M1 16 Go — data_big 86M, `--grad-ckpt --amp`, B64 ≈ 3 Go |
+| z300 | 301.5 M | location 4090 — data_big2 ~530M tok, fp16 + opt 8-bit

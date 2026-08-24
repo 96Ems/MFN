@@ -492,6 +492,19 @@ l'a mesuré et corrigé (parité bit-exacte vérifiée en CPU 2zf). Lancer
 Sur la 960M, la même commande fonctionne (la config `z30` y tourne ~10× plus
 lent : réserver pour bench/validations).
 
+### Résultats des derniers runs (24/08)
+
+| Run | Val | Ppl | Détail |
+|---|---|---:|---:|
+| `deep_2zf` (1.8M, 2 ep, subset 22.6M) | 2.5352 | 12.85 test | ✅ point P5 — bat deep_2l à iso/moins budget |
+| `sft_deep_2zf` ep 1 (UltraChat 29.4M) | 3.6783 | 39.58 | format assistant acquis |
+| `sft_deep_2zf` ep 2 | **3.5289** | **34.09** | moule poli, plafond de capacité 1.8M atteint |
+
+Verdict chat (4 questions greedy) : **moule unique « Certainly! Here are… »,
+aucune distinction de sujet** — documenté en détail dans `phase5/scaling.md`
+(section SFT + leçons : forgetting du conteur stories, fluence ≠ connaissance).
+Prochaine étape de valeur : z30 (72.7M) sur le Mac, z300 (301.5M) sur 4090.
+
 ### Synchronisation entre machines (git)
 
 Les données lourdes (`*.npy`, `*.parquet`, corpus bruts) ne sont PAS dans git
