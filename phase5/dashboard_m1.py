@@ -259,7 +259,7 @@ for (var i=0;i<d.runs.length;i++){
   if (c.alloc) h += '<h3>MPS alloc (Go)</h3>' + c.alloc;
   if (c.val) h += '<h3>val loss par epoch</h3>' + c.val;
   if (!c.loss && !c.tok) h += '<span class="dim">pas de métriques JSONL — '
-    + 'lancé avant l\'upgrade logging ?</span>';
+    + 'run lancé avant la mise à jour logging ?</span>';
   if (r.test) h += '<div class="hl">TEST ppl ' + r.test.ppl + '</div>';
   h += '<pre>' + esc(r.tail.join('\\n')) + '</pre></div>';
 }
