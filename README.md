@@ -469,7 +469,7 @@ python3 -m venv .venv && .venv/bin/pip install torch transformers tokenizers pya
 #     -> phase4/data_big2/ (cible z30/z300), ~30-60 min la 1re fois
 #   - data SFT UltraChat      : .venv/bin/python phase5/sft_data.py  (parquet auto-dl)
 # 1) bench d'abord (2 min) — ne JAMAIS lancer une campagne sans mesurer:
-.venv/bin/python phase5/train_deep.py --arch z30 --epochs 0 --batch 128 --device mps
+.venv/bin/python phase5/train_deep.py --arch z30 --bench --batch 128 --device mps
 # 2) entraînement (nuit) :
 .venv/bin/python phase5/train_deep.py --arch z30 --epochs 2 --batch 128 \
   --lr 1e-3 --device mps --data phase4/data_big --tag deep_z30 \

@@ -170,6 +170,9 @@ def main():
     ap.add_argument("--threads", type=int, default=2)
     ap.add_argument("--cuda", action="store_true")
     ap.add_argument("--limit-steps", type=int, default=0)
+    ap.add_argument("--bench", action="store_true",
+                    help="mode bench: --limit-steps étapes (défaut 30), affiche "
+                         "tok/s puis SORT SANS sauver de checkpoint ni de JSON")
     ap.add_argument("--out", default="results_deep.json")
     ap.add_argument("--tag", default=None)
     ap.add_argument("--start-epoch", type=int, default=1,
@@ -262,6 +265,13 @@ def main():
     optimizer = torch.optim.AdamW(
         [{"params": decay, "weight_decay": 0.1}, {"params": no_decay, "weight_decay": 0.0}],
         lr=args.lr, betas=(0.9, 0.999))
+    if args.bench:
+        args.limit_steps = args.limit_steps or 30
+        train_loss, tok_s = run_epoch(model, train_ids, optimizer, args, device)
+        print(f"[{tag}] BENCH {device}: {tok_s:.0f} tok/s "
+              f"(limit={args.limit_steps} steps, batch={args.batch}, "
+              f"seq={args.seq})", flush=True)
+        return
     best_val, history = float("inf"), history
     for ep in range(args.start_epoch, args.epochs + 1):
         t0 = time.time()
