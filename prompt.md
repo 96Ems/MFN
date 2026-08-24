@@ -46,24 +46,28 @@ Règle : `build_bigdata_stream.py` avec `MFN_FULL=1` construit le corpus COMPLET
 ## 3. Bench obligatoire (jamais de campagne sans mesure)
 
 ```bash
-.venv/bin/python phase5/train_deep.py --arch z30 --bench --batch 128 --device mps \
-  --data phase4/data_big --limit-steps 30
+.venv/bin/python phase5/train_deep.py --arch z30 --bench --batch 64 --device mps \
+  --data phase4/data_big --grad-ckpt --amp --limit-steps 30
 ```
 
-Lis le tok/s affiché (`BENCH mps: X tok/s`). Décisions :
-- tok/s ≥ 800  → batch 256 pour la campagne (plus de tok/s par nuit)
-- 250 ≤ tok/s < 800 → batch 128
-- tok/s < 250 → batch 128 quand même mais 1 seul epoch, puis SFT (voir §5)
+**CARTE MÉMOIRE RÉELLE (ton propre fix, août 2026)** : activations fp32 z30 à
+B128 ≈ **59 Go** → `--grad-ckpt --amp` OBLIGATOIRES pour z30+ (parité bit-exacte
+vérifiée en CPU 2zf). B64 + ckpt + amp ≈ **3 Go** (✓ M1 16 Go) ; B128 ≈ 6 Go
+(limite).
 
-Bencher aussi `--batch 256` si tu veux comparer ; garde le meilleur débit par
-Go de RAM (le Mac a 16 Go ; l'estimation d'occupation du z30 est ~3-4 Go).
+Lis le tok/s ET le `MPS alloc X.XX Go` affichés par le bench (`BENCH mps: ...`).
+- MPS alloc > 10 Go → baisse le batch (B32) : zone swap
+- OOM + lenteur = MÊME cause (pressure mémoire/swap) → baisse le batch d'abord
+- pressure mémoire : `export PYTORCH_MPS_HIGH_WATERMARK_RATIO=0.5`, fermer les apps lourdes
+- tok/s ≥ 800 → garde ce batch ; 250-800 → batch 128 si alloc < 10 Go ;
+  < 250 → batch 128, 1 seul epoch, puis SFT (voir §5)
 
 ## 4. Campagne deep_z30 (2 epochs, ~86M tokens par epoch)
 
 ```bash
-.venv/bin/python phase5/train_deep.py --arch z30 --epochs 2 --batch 128 --lr 1e-3 \
-  --device mps --data phase4/data_big --tag deep_z30 --out results_deep_m1.json \
-  > logs/p5_z30.log 2>&1 &
+.venv/bin/python phase5/train_deep.py --arch z30 --epochs 2 --batch 64 --lr 1e-3 \
+  --device mps --data phase4/data_big --grad-ckpt --amp --tag deep_z30 \
+  --out results_deep_m1.json > logs/p5_z30.log 2>&1 &
 caffeinate -dimsu &   # CRITIQUE : empêche le Mac de dormir (runs de nuit)
 ```
 

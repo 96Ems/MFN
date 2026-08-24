@@ -297,9 +297,12 @@ def main():
     if args.bench:
         args.limit_steps = args.limit_steps or 30
         train_loss, tok_s = run_epoch(model, train_ids, optimizer, args, device)
-        print(f"[{tag}] BENCH {device}: {tok_s:.0f} tok/s "
-              f"(limit={args.limit_steps} steps, batch={args.batch}, "
-              f"seq={args.seq})", flush=True)
+        line = f"[{tag}] BENCH {device}: {tok_s:.0f} tok/s " \
+               f"(limit={args.limit_steps} steps, batch={args.batch}, " \
+               f"seq={args.seq})"
+        if device == "mps" and hasattr(torch.mps, "current_allocated_memory"):
+            line += f" | MPS alloc {torch.mps.current_allocated_memory()/1e9:.2f} Go"
+        print(line, flush=True)
         return
     best_val, history = float("inf"), history
     for ep in range(args.start_epoch, args.epochs + 1):

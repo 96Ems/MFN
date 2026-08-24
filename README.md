@@ -468,19 +468,27 @@ python3 -m venv .venv && .venv/bin/pip install torch transformers tokenizers pya
 #   - corpus FULL ~530M tok   : MFN_FULL=1 .venv/bin/python phase5/build_bigdata_stream.py
 #     -> phase4/data_big2/ (cible z30/z300), ~30-60 min la 1re fois
 #   - data SFT UltraChat      : .venv/bin/python phase5/sft_data.py  (parquet auto-dl)
-# 1) bench d'abord (2 min) — ne JAMAIS lancer une campagne sans mesurer:
-.venv/bin/python phase5/train_deep.py --arch z30 --bench --batch 128 --device mps
-# 2) entraînement (nuit) :
-.venv/bin/python phase5/train_deep.py --arch z30 --epochs 2 --batch 128 \
-  --lr 1e-3 --device mps --data phase4/data_big --tag deep_z30 \
+# 1) bench d'abord (2 min) — ne JAMAIS lancer une campagne sans mesurer :
+#    CARTE MÉMOIRE RÉELLE : activations fp32 z30 B128 ≈ 59 Go ! Toujours
+#    --grad-ckpt --amp (parité bit-exacte vérifiée). B64+ckpt+amp ≈ 3 Go M1.
+.venv/bin/python phase5/train_deep.py --arch z30 --bench --batch 64 --device mps \
+  --data phase4/data_big --grad-ckpt --amp --limit-steps 30
+#    -> lit tok/s ET "MPS alloc X.XX Go" (bench). MPS alloc > 10 Go = swap, baisse le batch.
+#    Si pressure mémoire : export PYTORCH_MPS_HIGH_WATERMARK_RATIO=0.5
+# 2) entraînement (nuit) : batch selon bench ; --grad-ckpt --amp obligatoires z30+
+.venv/bin/python phase5/train_deep.py --arch z30 --epochs 2 --batch 64 --lr 1e-3 \
+  --device mps --data phase4/data_big --grad-ckpt --amp --tag deep_z30 \
   --out results_deep_m1.json
 # 3) SFT puis chat (même recette que 2zf) :
 .venv/bin/python phase5/train_sft.py --base deep_z30 --device mps --tag sft_deep_z30
 .venv/bin/python phase5/chat_ultra.py --tag sft_deep_z30
 ```
 
-Astuce M1 : préférer `--batch 128` (le MPS amortit mieux le launch-bound) et
-lancer `results_deep_m1.json` à part pour ne pas écraser les règles laptop.
+Astuce M1 : `--batch 64` par défaut avec `--grad-ckpt --amp` (≈3 Go) ; monter à
+128 seulement si le bench montre du budget (> 5 Go libres). Un `--batch 128`
+sans `--grad-ckpt` = ~59 Go d'activations = OOM/swap (lenteur + kill) — le Mac
+l'a mesuré et corrigé (parité bit-exacte vérifiée en CPU 2zf). Lancer
+`results_deep_m1.json` à part pour ne pas écraser les règles laptop.
 Sur la 960M, la même commande fonctionne (la config `z30` y tourne ~10× plus
 lent : réserver pour bench/validations).
 
