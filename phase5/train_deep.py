@@ -17,6 +17,15 @@ TOK = os.path.join(ROOT, "phase4", "tokenizer_subset")
 DATA = os.path.join(ROOT, "phase4", "data_subset")
 CKPT = os.path.join(ROOT, "phase5", "checkpoints")
 
+
+def _z_pair(L, W):
+    """Largeurs 2 zones asymetriques, espacement lineaire W..96 (zone A) et
+    ~0.62x (zone B), comme 2zf/z10. Genere les listes au lieu de les ecrire."""
+    A = [int(W - (W - 96) * i / (L - 1)) for i in range(L)]
+    B = [min(a, max(40, int(0.62 * a))) for a in A]
+    return dict(widths=A, zone_widths=[A, B])
+
+
 ARCHES = {
     "2l": dict(widths=[192, 96], topdown=True, skip_fb=False),
     "3l": dict(widths=[192, 128, 96], topdown=True, skip_fb=True),
@@ -45,6 +54,18 @@ ARCHES = {
                 zone_widths=[[160, 144, 128, 112, 96, 96, 96, 96, 80, 64],
                              [96, 88, 80, 72, 64, 64, 64, 56, 48, 40]],
                 zone_betas=[0.2, 0.6], zone_rates=[1, 2]),
+    # --- Z30 : 2 zones x 60 couches, espacement lineaire 304..96 ---
+    # 72.7M params — le gros modele local (MacBook M1 16G : ~3 Go VRAM,
+    # 1-2 nuits par epoch sur data_big 86M tok). Ratios 2zf/z10 conserves.
+    "z30": dict(topdown=True, skip_fb=True, n_threads=2, thread_fb=True,
+                fast=True, zone_betas=[0.2, 0.6], zone_rates=[1, 2],
+                **_z_pair(60, 304)),
+    # --- Z300 : 2 zones x 60 couches, espacement lineaire 688..96 ---
+    # ~305M params — cible location (4090, pas M1) : ~6-9 Go VRAM en
+    # fp16+opt8bit ; 3-4 j sur data_big2 (corpus complet ~530M tok).
+    "z300": dict(topdown=True, skip_fb=True, n_threads=2, thread_fb=True,
+                 fast=True, zone_betas=[0.2, 0.6], zone_rates=[1, 2],
+                 **_z_pair(60, 688)),
 }
 
 

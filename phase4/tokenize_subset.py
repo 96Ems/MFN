@@ -1,15 +1,20 @@
 import json
 import os
 import random
+import sys
 
 import numpy as np
 from tokenizers import Tokenizer, models, pre_tokenizers, decoders, trainers
 from transformers import PreTrainedTokenizerFast
 
 ROOT = os.path.dirname(os.path.abspath(__file__))
-CACHE = "/home/emericclement/.cache/huggingface/hub/datasets--roneneldan--TinyStories/snapshots/f54c09fd23315a6f9c86f9dc80f725de7d8f9c64"
-TRAIN_TXT = os.path.join(CACHE, "TinyStories-train.txt")
-VALID_TXT = os.path.join(CACHE, "TinyStories-valid.txt")
+SYSP = os.path.dirname(ROOT)
+for p in (SYSP, os.path.join(SYSP, "phase5")):
+    if p not in sys.path:
+        sys.path.insert(0, p)
+from build_bigdata_stream import find_tinystories_txt  # noqa: E402
+TRAIN_TXT = find_tinystories_txt("train")
+VALID_TXT = find_tinystories_txt("valid")
 OUT_DIR = os.path.join(ROOT, "tokenizer_subset")
 DATA = os.path.join(ROOT, "data_subset")
 VOCAB_SIZE = 4096

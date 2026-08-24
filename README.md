@@ -437,3 +437,56 @@ Contrôles : ⏯ / pas manuel / reset, vitesse, curseur **« fatigue → épaiss
   par pas), GPT-2 mini **74 tok/s** (boucle KV manuelle, 4 couches d'attention ;
   48 tok/s via `generate()`). Le chat utilise automatiquement le chemin le
   plus rapide (`chat_stories.py`).
+
+---
+
+## ⚡ Phase 5 — entraînement DEEP (2zf/Z10/Z30/Z300)
+
+Tout le code d'entraînement profond vit dans `phase5/` (`train_deep.py`,
+`deepmfn.py`, `train_sft.py`, `chat_ultra.py`, `dashboard.py`).
+
+**Machines supportées** : CUDA (laptop 960M), **MPS (MacBook M1/M2)** et CPU —
+détection automatique (`cuda → mps → cpu`), ou forcer avec `--device`.
+
+### Modèles (configs calibrées par comptage réel)
+
+| Arch | Couches × zones | Paramètres | Usage |
+|---|---|---|---|
+| `2zf` | 2 × 2 | 1.8 M | démo, SFT, chaîne complète |
+| `z10` | 10 × 2 | 4.7 M | bench variantes |
+| `z30` | 60 × 2 | **72.7 M** | gros modèle LOCAL (M1 16G : ~3 Go, 2-4 nuits/epoch sur data_big) |
+| `z300` | 60 × 2 | **301.5 M** | cible LOCATION 4090 (fp16+opt 8-bit : ~8 Go) |
+
+### Démarrage rapide sur MacBook M1 (16 Go)
+
+```bash
+git clone https://github.com/96Ems/MFN && cd MFN
+python3 -m venv .venv && .venv/bin/pip install torch transformers tokenizers pyarrow numpy
+# données (auto-téléchargées si absentes) :
+#   - TinyStories sous-ensemble : phase4/tokenize_subset.py (auto-dl si absent)
+#   - corpus big 86M tok      : MFN_FULL=0 .venv/bin/python phase5/build_bigdata_stream.py
+#   - corpus FULL ~530M tok   : MFN_FULL=1 .venv/bin/python phase5/build_bigdata_stream.py
+#     -> phase4/data_big2/ (cible z30/z300), ~30-60 min la 1re fois
+#   - data SFT UltraChat      : .venv/bin/python phase5/sft_data.py  (parquet auto-dl)
+# 1) bench d'abord (2 min) — ne JAMAIS lancer une campagne sans mesurer:
+.venv/bin/python phase5/train_deep.py --arch z30 --epochs 0 --batch 128 --device mps
+# 2) entraînement (nuit) :
+.venv/bin/python phase5/train_deep.py --arch z30 --epochs 2 --batch 128 \
+  --lr 1e-3 --device mps --data phase4/data_big --tag deep_z30 \
+  --out results_deep_m1.json
+# 3) SFT puis chat (même recette que 2zf) :
+.venv/bin/python phase5/train_sft.py --base deep_z30 --device mps --tag sft_deep_z30
+.venv/bin/python phase5/chat_ultra.py --tag sft_deep_z30
+```
+
+Astuce M1 : préférer `--batch 128` (le MPS amortit mieux le launch-bound) et
+lancer `results_deep_m1.json` à part pour ne pas écraser les règles laptop.
+Sur la 960M, la même commande fonctionne (la config `z30` y tourne ~10× plus
+lent : réserver pour bench/validations).
+
+### Synchronisation entre machines (git)
+
+Les données lourdes (`*.npy`, `*.parquet`, corpus bruts) ne sont PAS dans git
+— reconstruises par les scripts ci-dessus ; les checkpoints `phase5/checkpoints/`
+(quelques Mo) SONT versionnés : `git pull` sur le Mac puis `git push` depuis le
+laptop (ou l'inverse) suffisent pour transporter un modèle entraîné.

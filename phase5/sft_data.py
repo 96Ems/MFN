@@ -14,6 +14,23 @@ N_TRAIN, N_VAL, SEED = 14700, 300, 0
 USER, ASST, EOS = "User: ", "\nAssistant: ", "<|endoftext|>"
 
 
+def ensure_parquet():
+    """Télécharge la tranche UltraChat SFT (~250 Mo) si absente — portable
+    laptop/Mac (le .parquet n'est pas dans git)."""
+    if os.path.exists(SRC):
+        return SRC
+    os.makedirs(os.path.dirname(SRC), exist_ok=True)
+    print("parquet UltraChat absent -> téléchargement ~250 Mo "
+          "(une seule fois)...", flush=True)
+    from huggingface_hub import hf_hub_download
+    p = hf_hub_download(repo_id="stingning/ultrachat",
+                        filename="data/train_sft-00.parquet",
+                        repo_type="dataset",
+                        local_dir=os.path.dirname(SRC))
+    os.replace(p, SRC)
+    return SRC
+
+
 def fmt_dialogue(msgs, tok, masks_out):
     ids, masks = [], []
     for m in msgs:
@@ -31,7 +48,8 @@ def fmt_dialogue(msgs, tok, masks_out):
 def main():
     os.makedirs(OUT, exist_ok=True)
     tok = AutoTokenizer.from_pretrained(TOK)
-    t = pq.read_table(SRC)
+    src = ensure_parquet()
+    t = pq.read_table(src)
     dials = t.column("messages").to_pylist()
     print(f"total dialogues: {len(dials)}", flush=True)
 

@@ -10,18 +10,38 @@ import json, os, random
 import numpy as np
 from transformers import PreTrainedTokenizerFast
 
-ROOT = "/home/emericclement/dev/MFN/phase4"
-TRAIN_TXT = ("/home/emericclement/.cache/huggingface/hub/datasets--roneneldan--"
-             "TinyStories/snapshots/f54c09fd23315a6f9c86f9dc80f725de7d8f9c64/"
-             "TinyStories-train.txt")
-VALID_TXT = ("/home/emericclement/.cache/huggingface/hub/datasets--roneneldan--"
-             "TinyStories/snapshots/f54c09fd23315a6f9c86f9dc80f725de7d8f9c64/"
-             "TinyStories-valid.txt")
-TOK = os.path.join(ROOT, "tokenizer_subset")
-DATA = os.path.join(ROOT, "data_big")
-STOR = os.path.join(ROOT, "data_big_stories")
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+TOK = os.path.join(ROOT, "phase4", "tokenizer_subset")
+DATA = os.path.join(ROOT, "phase4", "data_big")
+STOR = os.path.join(ROOT, "phase4", "data_big_stories")
 MARKER = "<|endoftext|>"
 N_TRAIN, N_VAL, N_TEST = 400_000, 2_000, 2_000
+FULL = os.environ.get("MFN_FULL", "0") == "1"
+
+
+def hf_cache_dir(dataset):
+    """~/.cache/huggingface/hub/datasets--<org>--<name>  (portable M1/laptop)."""
+    return os.path.join(os.path.expanduser("~"), ".cache", "huggingface",
+                        "hub", "datasets--" + dataset.replace("/", "--"))
+
+
+def find_tinystories_txt(kind):
+    """Localise TinyStories-{train,valid}.txt dans le cache HF, sinon
+    télécharge le corpus (~2 Go la 1re fois). Même chemin sur laptop et Mac."""
+    name = f"TinyStories-{kind}.txt"
+    base = hf_cache_dir("roneneldan/TinyStories")
+    snaps = os.path.join(base, "snapshots")
+    if os.path.isdir(snaps):
+        for snap in os.listdir(snaps):
+            p = os.path.join(snaps, snap, name)
+            if os.path.exists(p):
+                print(f"TinyStories {kind} trouvé: {p}", flush=True)
+                return p
+    print(f"TinyStories introuvable dans le cache HF -> téléchargement "
+          f"({name}, ~1 Go), une seule fois...", flush=True)
+    from huggingface_hub import hf_hub_download
+    return hf_hub_download(
+        repo_id="roneneldan/TinyStories", filename=name, repo_type="dataset")
 
 
 def iter_stories(path):
@@ -42,9 +62,10 @@ def iter_stories(path):
         yield idx, "\n".join(buf)
 
 
-def build_split(path, n, tag, exclude=None):
+def build_split(path, n, tag, exclude=None, total_hint=2_119_718):
     os.makedirs(STOR, exist_ok=True)
-    total_hint = {"train": 2_119_718, "validation": 21_989, "test": 21_989}[tag]
+    hints = {"train": 2_119_718, "validation": 21_989, "test": 21_989}
+    total_hint = hints[tag] if total_hint is None else total_hint
     rng = random.Random({"train": 10, "validation": 11, "test": 12}[tag])
     pool_max = total_hint
     keep = set(rng.sample(range(pool_max), n))
@@ -89,14 +110,23 @@ def build_split(path, n, tag, exclude=None):
 
 
 def main():
+    global DATA
+    TRAIN_TXT = find_tinystories_txt("train")
+    VALID_TXT = find_tinystories_txt("valid")
+    if FULL:
+        DATA = os.path.join(ROOT, "phase4", "data_big2")
+        print("== MODE FULL: corpus TinyStories complet (~530M tokens) -> "
+              "data_big2 (cible z30/z300) ==", flush=True)
     old = set(random.Random(0).sample(range(2_119_718), 100_000))
     print(f"exclusion des {len(old)} stories du subset original", flush=True)
 
     os.makedirs(DATA, exist_ok=True)
     stats = {}
-    for tag, path, n, excl in (("train", TRAIN_TXT, N_TRAIN, old),
-                               ("validation", VALID_TXT, N_VAL, None),
-                               ("test", VALID_TXT, N_TEST, None)):
+    for tag, path, n, excl in (
+            ("train", TRAIN_TXT,
+             2_119_718 if FULL else N_TRAIN, None if FULL else old),
+            ("validation", VALID_TXT, 21_989 if FULL else N_VAL, None),
+            ("test", VALID_TXT, 21_989 if FULL else N_TEST, None)):
         arr, kept, n_chars, _ = build_split(path, n, tag, excl)
         np.save(os.path.join(DATA, f"{tag}.npy"), arr)
         stats[tag] = {"tokens": int(len(arr)), "chars": int(n_chars),
