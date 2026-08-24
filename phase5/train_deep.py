@@ -16,6 +16,18 @@ from lm2 import true_param_count  # noqa: E402
 TOK = os.path.join(ROOT, "phase4", "tokenizer_subset")
 DATA = os.path.join(ROOT, "phase4", "data_subset")
 CKPT = os.path.join(ROOT, "phase5", "checkpoints")
+LOGDIR = os.path.join(ROOT, "logs")
+
+
+def _log_metrics(tag, rec):
+    """JSONL temps réel pour dashboard_m1.py — 1 ligne par point, flush immédiat.
+    Jamais bloquant : un échec d'écriture ne doit pas tuer un run."""
+    try:
+        os.makedirs(LOGDIR, exist_ok=True)
+        with open(os.path.join(LOGDIR, f"metrics_{tag}.jsonl"), "a") as f:
+            f.write(json.dumps(rec) + "\n")
+    except Exception:
+        pass
 
 
 def _z_pair(L, W):
@@ -75,10 +87,11 @@ def load_data(data_dir=DATA):
     return t("train"), t("validation"), t("test"), stats
 
 
-def run_epoch(model, train_ids, optimizer, args, device):
+def run_epoch(model, train_ids, optimizer, args, device, epoch=None):
     model.train()
     scaler = torch.amp.GradScaler(device) if getattr(args, "amp", False) \
         and device != "cpu" else None
+    mtag = getattr(args, "tag_resolved", None) or "run"
     N = train_ids.shape[0]
     L = (N - 1) // (args.batch * args.seq) * (args.batch * args.seq)
     x = train_ids[0:L].view(args.batch, -1, args.seq)
@@ -155,8 +168,23 @@ def run_epoch(model, train_ids, optimizer, args, device):
                 sp.copy_(p)
         total += li * y[:, s].numel()
         n_tok += y[:, s].numel()
-        if s % 250 == 0:
-            print(f"    step {s}/{steps} loss {li:.4f} [{time.time()-t0:.0f}s]", flush=True)
+        if args.log_every and (s % args.log_every == 0 or s == steps - 1):
+            el = time.time() - t0
+            rate = n_tok / max(el, 1e-9)
+            alloc_gb = None
+            if device == "mps" and hasattr(torch.mps, "current_allocated_memory"):
+                alloc_gb = torch.mps.current_allocated_memory() / 2**30
+            # préfixe compatible dashboard (STEP_RE) + détails temps réel
+            print(f"    step {s}/{steps} loss {li:.4f} [{el:.0f}s] "
+                  f"| {rate:.0f} tok/s · ema {ema:.3f} · lr {lr:.2e}"
+                  + (f" · alloc {alloc_gb:.2f} Go" if alloc_gb else ""),
+                  flush=True)
+            _log_metrics(mtag, {"ts": time.time(), "kind": "step",
+                                "epoch": epoch, "step": s, "steps": steps,
+                                "loss": round(li, 4), "ema": round(ema, 4),
+                                "tok_s": round(rate, 1), "lr": lr,
+                                "alloc_gb": round(alloc_gb, 2) if alloc_gb else None,
+                                "batch": args.batch, "seq": args.seq})
     return total / n_tok, n_tok / (time.time() - t0)
 
 
@@ -209,6 +237,9 @@ def main():
                     help="autocast fp16 + GradScaler (mps/cuda) : activations "
                          "/2 + GEMMs plus rapides — voir REPORT_MAC.md")
     ap.add_argument("--eval-batch", type=int, default=16)
+    ap.add_argument("--log-every", type=int, default=10,
+                    help="1 ligne de log + point JSONL tous les N steps "
+                         "(dashboard temps réel)")
     ap.add_argument("--data", default=DATA,
                     help="dir contenant train/validation/test.npy + stats.json "
                          "(défaut: phase4/data_subset ; ex big: phase4/data_big)")
@@ -240,6 +271,7 @@ def main():
     fast = kw.pop("fast", False)
     zrates = kw.pop("zone_rates", None)
     tag = args.tag or f"deep_{args.arch}"
+    args.tag_resolved = tag          # pour le logging JSONL temps réel
     ckpt_dir = os.path.join(CKPT, tag)
     # Historique des epochs 1-2 du run deep_2l interrompu (logs p5_2l.log) —
     # backfillé pour garder un historique complet dans results_deep.json.
@@ -314,6 +346,10 @@ def main():
         print(f"[{tag}] epoch {ep}/{args.epochs}: train {train_loss:.4f} | "
               f"val {val_loss:.4f} ppl {ppl:.2f} bpc {bpc:.4f} "
               f"({tok_s:.0f} tok/s, {time.time()-t0:.0f}s)", flush=True)
+        _log_metrics(tag, {"ts": time.time(), "kind": "epoch", "epoch": ep,
+                           "train_loss": round(train_loss, 4),
+                           "val_loss": round(val_loss, 4), "ppl": round(ppl, 2),
+                           "bpc": round(bpc, 4), "tok_s": round(float(tok_s), 1)})
         history.append({"epoch": ep, "train_loss": round(train_loss, 4),
                         "val_loss": round(val_loss, 4), "ppl": round(ppl, 2),
                         "bpc": round(bpc, 4), "tok_s": round(float(tok_s), 1)})
@@ -329,6 +365,9 @@ def main():
     ppl_t, bpc_t = float(np.exp(test_loss)), \
         test_loss * stats["test"]["tokens_per_char"] / np.log(2.0)
     print(f"[{tag}] TEST loss {test_loss:.4f} ppl {ppl_t:.2f} bpc {bpc_t:.4f}", flush=True)
+    _log_metrics(tag, {"ts": time.time(), "kind": "test",
+                       "loss": round(float(test_loss), 4),
+                       "ppl": round(ppl_t, 2), "bpc": round(bpc_t, 4)})
 
     res = {"tag": tag, "arch": args.arch, "widths": kw["widths"],
            "topdown": kw["topdown"], "skip_fb": kw["skip_fb"],

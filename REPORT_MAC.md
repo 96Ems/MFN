@@ -86,7 +86,26 @@ Coût chiffré : 4.9M params (7.4 % de z30). **Décision : on garde `skip_fb=Tru
 tel quel** pour la campagne (comparabilité P0-P4/laptop). Une ablation
 `z30ns` (sans skip) reste une option falsifiable documentée ici pour plus tard.
 
-## 7. Prochaines étapes recommandées
+## 7. Dashboard temps réel (nouveau, `phase5/dashboard_m1.py`)
+
+L'ancien `dashboard.py` est Linux-only (/proc, nvidia-smi) — sur Mac il
+n'affichait rien. `dashboard_m1.py` est son portage macOS + courbes :
+
+```bash
+# pendant tout run : dans un 2e terminal
+.venv/bin/python phase5/dashboard_m1.py        # -> http://localhost:8766
+```
+
+- **Sources** : flux JSONL `logs/metrics_<tag>.jsonl` écrits par
+  `train_deep.py --log-every N` (défaut 10) : loss/EMA, tok/s, alloc MPS,
+  lr par step ; résumés epoch/test ; auto-découverte de tout nouveau tag.
+- **Courbes SVG inline** : loss par step, débit, alloc mémoire, val par epoch.
+- **Système** : loadavg, % RAM libre, swap, **alerte thermique** (`pmset -g therm`,
+  CPU_Speed_Limit < 100 % = throttling), process MFN actifs avec RSS.
+- **ETA** : (steps restants × tokens/step) ÷ tok/s courant, format min/jours.
+- Zéro dépendance (stdlib) ; `/api/status` renvoie le JSON brut si besoin.
+
+## 8. Prochaines étapes recommandées
 
 1. Corriger la doc README (« z30 ~3 Go » → réalité avec/sans `--grad-ckpt`)
 2. Sur laptop : même pipeline `--grad-ckpt --amp` devrait profiter à la 960M
