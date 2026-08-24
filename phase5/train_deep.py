@@ -163,12 +163,21 @@ def main():
                     help="dir contenant train/validation/test.npy + stats.json "
                          "(défaut: phase4/data_subset ; ex big: phase4/data_big)")
     ap.add_argument("--tok", default=TOK, help="tokenizer dir")
+    ap.add_argument("--device", default=None,
+                    help="force device: cuda | mps | cpu (défaut: auto)")
     args = ap.parse_args()
 
     torch.set_num_threads(args.threads)
     torch.manual_seed(args.seed)
     np.random.seed(args.seed)
-    device = "cuda" if args.cuda and torch.cuda.is_available() else "cpu"
+    if args.device:
+        device = args.device
+    elif args.cuda and torch.cuda.is_available():
+        device = "cuda"
+    elif torch.backends.mps.is_available():
+        device = "mps"
+    else:
+        device = "cpu"
     print(f"device: {device}", flush=True)
 
     train_ids, val_ids, test_ids, stats = load_data(args.data)

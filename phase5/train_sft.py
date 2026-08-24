@@ -70,6 +70,8 @@ def main():
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--threads", type=int, default=1)
     ap.add_argument("--cuda", action="store_true")
+    ap.add_argument("--device", default=None,
+                    help="force device: cuda | mps | cpu (défaut: auto)")
     ap.add_argument("--limit-steps", type=int, default=0)
     ap.add_argument("--out", default="results_sft.json")
     args = ap.parse_args()
@@ -77,7 +79,14 @@ def main():
     torch.set_num_threads(args.threads)
     torch.manual_seed(args.seed)
     np.random.seed(args.seed)
-    device = "cuda" if args.cuda and torch.cuda.is_available() else "cpu"
+    if args.device:
+        device = args.device
+    elif args.cuda and torch.cuda.is_available():
+        device = "cuda"
+    elif torch.backends.mps.is_available():
+        device = "mps"
+    else:
+        device = "cpu"
     print(f"device: {device}", flush=True)
 
     train_ids, train_mask, val_ids, val_mask, stats = load_data()
